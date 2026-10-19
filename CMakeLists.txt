@@ -4,15 +4,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Name your executable
-set(PROJECT_NAME cool_game)
+set(PROJECT_NAME BoidsGalaxy)
 
 project(${PROJECT_NAME})
 
 # Path to source files
-set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/game/)
+set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/game/src/)
 
 # Change where the .exe is located - asset path depends on where this is located
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/game)
 
 include(FetchContent)
 FetchContent_Declare(
