@@ -48,11 +48,13 @@ public:
 	* @param camera_up Normal to the plane of movement
 	*/
 	inline glm::vec3 playerDirection(const glm::vec3& camera_direction = TAGBaseState::camera_direction, const glm::vec3& camera_up = TAGBaseState::camera_up) const {
-		if (glm::dot(camera_direction, camera_direction) == 0.0f || glm::dot(camera_up, camera_up) == 0.0f) return {};
+		if (glm::dot(camera_direction, camera_direction) == 0.0f) return {};
+
+		const bool free_movement = (camera_up == glm::vec3(0.0f));
 
 		glm::vec3 camera_velocity{};
-		const glm::vec3 right = glm::normalize(glm::cross(camera_direction, camera_up));
-		const glm::vec3 forward = glm::normalize(glm::cross(camera_up, right));
+		const glm::vec3 right = glm::normalize(glm::cross(camera_direction, (free_movement ? glm::vec3(0.0f, 1.0f, 0.0f) : camera_up)));
+		const glm::vec3 forward = (!free_movement ? glm::normalize(glm::cross(camera_up, right)) : camera_direction);
 
 		if (TAGBaseState::getKeyState(forward_key)) camera_velocity += forward;
 

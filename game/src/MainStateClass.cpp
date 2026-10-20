@@ -1,26 +1,13 @@
 #include "../include/MainStateClass.hpp"
 
 MainState::MainState() {
-	static const std::vector<TAGMesh::Vertex> vertices = {
-		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() },
-		{ glm::vec3(0.0f, -1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() },
-		{ glm::vec3(0.0f, -1.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() }
-	};
-	static const std::vector<TAGMesh::Fragment> fragments = { { 0, 1, 2 }, { 3, 4, 5 } };
-	boids.addMesh(boid_mesh, vertices, fragments, { .colour = glm::vec3(1.0f, 0.0f, 0.0f) });
-	boids.setInstance({ .position = glm::vec3(0.0f, 0.0f, 0.0f), .scale = 5.0f }, -1, boid_mesh);
+	TAGBaseState::far = 300.0f;
 
 	sunlight.setLight({ .direction = glm::normalize(glm::vec3(1.0f, -1.0f, 1.0f)), .colour = { 1.0f, 1.0f, 1.0f } });
 	sunlight.bindToShader();
 
 	shaders.useShader(main_shader).set(TAGShaderManager::default_options.ambience, AMBIENCE);
-	shaders.setAll<glm::mat4>(shader_names,
-		{ TAGShaderManager::default_options.perspective_mat },
-		{ createPerspectiveMatrix() }
-	);
+	setProjectiveMatrix();
 }
 
 void MainState::mouseCallback() {
@@ -28,10 +15,7 @@ void MainState::mouseCallback() {
 }
 
 void MainState::framebufferSizeCallback() {
-	shaders.setAll<glm::mat4>(shader_names,
-		{ TAGShaderManager::default_options.perspective_mat },
-		{ createPerspectiveMatrix() }
-	);
+	setProjectiveMatrix();
 }
 
 std::string MainState::mainLoop() {
@@ -42,16 +26,29 @@ std::string MainState::mainLoop() {
 		setMouseLock(TAGEnum::TOGGLE);
 	}
 
-	camera_position += player_controller.playerDirection() * SPEED * (float)delta_time;
+	camera_position += player_controller.playerDirection(camera_direction, glm::vec3(0.0f)) * SPEED * (float)delta_time;
 
+	setCameraMatrix();
+
+	flock_controller.updateFlock((float)delta_time);
+
+	flock_controller.drawAll(shaders.useShader(main_shader));
+	skybox.draw(shaders.useShader(skybox_shader));
+
+	return "CURRENT";
+}
+
+void MainState::setCameraMatrix() const {
 	const glm::mat4 cam_mat = createCameraMatrix();
 	shaders.setAll<glm::mat4>(shader_names,
 		{ TAGShaderManager::default_options.camera_mat },
 		{ cam_mat, glm::mat4(glm::mat3(cam_mat)) }
 	);
+}
 
-	boids.drawAll(shaders.useShader(main_shader), boid_mesh, {.cull_backface = false});
-	skybox.draw(shaders.useShader(skybox_shader));
-
-	return "CURRENT";
+void MainState::setProjectiveMatrix() const {
+	shaders.setAll<glm::mat4>(shader_names,
+		{ TAGShaderManager::default_options.perspective_mat },
+		{ createPerspectiveMatrix() }
+	);
 }
