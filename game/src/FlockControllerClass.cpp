@@ -1,6 +1,6 @@
 #include "../include/FlockControllerClass.hpp"
 
-FlockController::FlockController(size_t boid_count, float boid_min_speed, float boid_max_speed) : min_speed(boid_min_speed), max_speed(max_speed)
+FlockController::FlockController(size_t boid_count, float boid_min_speed, float boid_max_speed) : min_speed(boid_min_speed), max_speed(boid_max_speed)
 {
 	static const std::vector<TAGMesh::Vertex> vertices = {
 		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
@@ -11,7 +11,7 @@ FlockController::FlockController(size_t boid_count, float boid_min_speed, float 
 		{ glm::vec3(0.0f, -1.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() }
 	};
 	static const std::vector<TAGMesh::Fragment> fragments = { { 0, 1, 2 }, { 3, 4, 5 } };
-	const float avg_speed = (boid_max_speed - boid_min_speed) / 2.0f;
+	const float start_speed = (boid_max_speed - boid_min_speed) / 2.0f;
 
 	boid_model.addMesh(BOID_MESH_NAME, vertices, fragments, { .colour = glm::vec3(1.0f, 0.0f, 0.0f) });
 	boid_data.reserve(boid_count);
@@ -23,9 +23,9 @@ FlockController::FlockController(size_t boid_count, float boid_min_speed, float 
 		};
 
 		glm::vec3 dir = {
-			TAGUtil::randomFloat<float>(),
-			TAGUtil::randomFloat<float>(),
-			TAGUtil::randomFloat<float>()
+			TAGUtil::randomFloat<float>() * 2.0f - 1.0f,
+			TAGUtil::randomFloat<float>() * 2.0f - 1.0f,
+			TAGUtil::randomFloat<float>() * 2.0f - 1.0f
 		};
 		dir = glm::normalize((glm::dot(dir, dir) == 0.0f ? glm::vec3(1.0f) : dir));
 
@@ -34,13 +34,13 @@ FlockController::FlockController(size_t boid_count, float boid_min_speed, float 
 		obj.scale = 1.5f;
 
 		boid_model.setInstance(obj, -1, BOID_MESH_NAME);
-		boid_data.emplace_back(avg_speed, dir);
+		boid_data.emplace_back(start_speed, dir);
 	}
 	boid_model.updateInstanceBuffer(BOID_MESH_NAME);
 }
 
 void FlockController::updateFlock(float dt) {
-	TAGMesh::BoundingBox margins = { .max = game_bounds.max * 0.98f, .min = game_bounds.min * 0.98f };
+	TAGMesh::BoundingBox margins = { .max = game_bounds.max * 0.87f, .min = game_bounds.min * 0.87f };
 	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
 	std::vector<TAGModel::Object> new_boids(boids.size());
 	std::vector<BoidMovement> new_boids_movements(boids.size());
@@ -68,27 +68,26 @@ void FlockController::updateFlock(float dt) {
 			};
 		}
 
-		BoidMovement new_boid_movement{};
-
+		BoidMovement new_boid_movement = boid_movement;
+		glm::vec3 boid_vel = boid_movement.direction * boid_movement.speed;
 		if (visible_boids > 0) {
-			glm::vec3 boid_vel = boid_movement.direction * boid_movement.speed;
-
-			boid_vel += 
+			boid_vel += (
 				((vel_avg / (float)visible_boids) - boid_vel) * alignment_factor + 
-				((pos_avg / (float)visible_boids) - boid.position) * cohesion_factor +
-				move_away * separation_factor;
-
-			const float length = glm::length(boid_vel);
-			new_boid_movement.speed = glm::clamp(length, min_speed, max_speed);
-			new_boid_movement.direction = (length == 0.0f ? boid_movement.direction : boid_vel / length);
+				((pos_avg / (float)visible_boids) - boid.position) * cohesion_factor
+			) * dt;
 		}
-		else {
-			new_boid_movement = boid_movement;
+		if (move_away != glm::vec3(0.0f)) {
+			boid_vel += move_away * separation_factor * dt;
 		}
+		boid_vel += (glm::clamp(boid.position, margins.min, margins.max) - boid.position) * turn_factor * dt;
 
-		TAGModel::Object new_boid = pointDirection(boid_movement.direction, new_boid_movement.direction);
+		const float length = glm::length(boid_vel);
+		new_boid_movement.speed = glm::clamp(length, min_speed, max_speed);
+		new_boid_movement.direction = (length == 0.0f ? boid_movement.direction : boid_vel / length);
+
+		TAGModel::Object new_boid = pointDirection(START_DIR, new_boid_movement.direction);
 		new_boid.scale = boid.scale;
-		new_boid.position = boid.position + (new_boid_movement.direction * new_boid_movement.speed + (glm::clamp(boid.position, margins.min, margins.max) - boid.position) * turn_factor) * dt;
+		new_boid.position = boid.position + new_boid_movement.direction * new_boid_movement.speed * dt;
 
 		new_boids[i] = new_boid;
 		new_boids_movements[i] = new_boid_movement;

@@ -4,10 +4,10 @@
 
 class FlockController {
 public:
-	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.5f;
-	float protected_range = 0.25f, visible_range = 10000.0f;
+	float separation_factor = 0.1f, alignment_factor = 0.1f, cohesion_factor = 0.02f;
+	float protected_range = 9.0f, visible_range = 2500.0f;
 	float turn_factor = 0.2f;
-	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(50.0f), .min = glm::vec3(-50.0f)};
+	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(150.0f), .min = glm::vec3(-150.0f)};
 	float min_speed, max_speed;
 
 	FlockController(size_t boid_count, float boid_min_speed, float boid_max_speed);
