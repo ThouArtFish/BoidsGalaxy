@@ -1,9 +1,11 @@
 #include "../include/MainStateClass.hpp"
 
 MainState::MainState() {
-	TAGBaseState::far = 300.0f;
+	TAGBaseState::far = 800.0f;
 
-	sunlight.setLight({ .direction = glm::normalize(glm::vec3(1.0f, -1.0f, 1.0f)), .colour = { 1.0f, 1.0f, 1.0f } });
+	planet_manager.generatePlanets();
+
+	sunlight.setLight({ .direction = { 1.0f, 0.0f, 0.0f }, .colour = { 1.0f, 1.0f, 1.0f } });
 	sunlight.bindToShader();
 
 	shaders.useShader(main_shader).set(TAGShaderManager::default_options.ambience, AMBIENCE);
@@ -32,7 +34,9 @@ std::string MainState::mainLoop() {
 
 	flock_controller.updateFlock((float)delta_time);
 
-	flock_controller.drawAll(shaders.useShader(main_shader));
+	const auto& shader = shaders.useShader(main_shader);
+	flock_controller.drawAll(shader);
+	planet_manager.drawAll(shader);
 	skybox.draw(shaders.useShader(skybox_shader));
 
 	return "CURRENT";
