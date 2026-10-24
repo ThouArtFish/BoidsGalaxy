@@ -157,25 +157,24 @@ void FlockController::updateFlock(float dt) {
 		}
 
 		// Splitting
-		std::vector<size_t> split_cascade_stack{ new_leaf_index };
+		std::vector<size_t> split_cascade_stack{ boid_data.leaf };
 		while (!split_cascade_stack.empty()) {
 			const size_t node_index = split_cascade_stack.back();
-			OctreeNode& node = octree[node_index];
 			split_cascade_stack.pop_back();
 
-			if (node.boid_indices.size() > OCTREE_MAX_BOIDS && node.depth <= OCTREE_MAX_DEPTH) {
-				auto child_bounds = splitNode(node.bounds);
+			if (octree[node_index].boid_indices.size() > OCTREE_MAX_BOIDS && octree[node_index].depth <= OCTREE_MAX_DEPTH) {
+				auto child_bounds = splitNode(octree[node_index].bounds);
 				if (!free_intervals.empty()) {
-					node.first_child_index = free_intervals.back();
+					octree[node_index].first_child_index = free_intervals.back();
 					free_intervals.pop_back();
-					for (size_t i = 0; i < 8; i++) octree[node.first_child_index + i] = OctreeNode(node_index, node.depth + 1, child_bounds[i]);
+					for (size_t i = 0; i < 8; i++) octree[octree[node_index].first_child_index + i] = OctreeNode(node_index, octree[node_index].depth + 1, child_bounds[i]);
 				}
 				else {
-					node.first_child_index = octree.size();
-					for (size_t i = 0; i < 8; i++) octree.emplace_back(node_index, node.depth + 1, child_bounds[i]);
+					octree[node_index].first_child_index = octree.size();
+					for (size_t i = 0; i < 8; i++) octree.emplace_back(node_index, octree[node_index].depth + 1, child_bounds[i]);
 				}
 
-				for (size_t boid_index : node.boid_indices) {
+				for (size_t boid_index : octree[node_index].boid_indices) {
 					const size_t leaf_index = getBoidLeaf(current_boids[boid_index].position, node_index);
 					octree[leaf_index].boid_indices.push_back(boid_index);
 
@@ -183,7 +182,7 @@ void FlockController::updateFlock(float dt) {
 
 					boids_data[boid_index].leaf = leaf_index;
 				}
-				node.boid_indices.clear();
+				octree[node_index].boid_indices.clear();
 			}
 		}
 	}
