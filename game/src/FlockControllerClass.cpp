@@ -13,7 +13,7 @@ FlockController::FlockController(size_t boid_count) {
 	const float start_speed = (max_speed - min_speed) / 2.0f;
 
 	boid_model.addMesh(BOID_MESH_NAME, vertices, fragments, { .colour = glm::vec3(1.0f, 0.0f, 0.0f) });
-	boid_data.reserve(boid_count);
+	boids_data.reserve(boid_count);
 	for (size_t i = 0; i < boid_count; i++) {
 		const glm::vec3 spawn_pos = {
 			TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
@@ -22,78 +22,70 @@ FlockController::FlockController(size_t boid_count) {
 		};
 
 		glm::vec3 dir = {
-			TAGUtil::randomFloat<float>() * 2.0f - 1.0f,
-			TAGUtil::randomFloat<float>() * 2.0f - 1.0f,
-			TAGUtil::randomFloat<float>() * 2.0f - 1.0f
+			TAGUtil::randomRangeFloat(-1.0f, 1.0f),
+			TAGUtil::randomRangeFloat(-1.0f, 1.0f),
+			TAGUtil::randomRangeFloat(-1.0f, 1.0f)
 		};
 		dir = glm::normalize((glm::dot(dir, dir) == 0.0f ? glm::vec3(1.0f) : dir));
 
-		TAGModel::Object obj = pointDirection(START_DIR, dir);
+		TAGModel::Object obj = pointDirection(dir);
 		obj.position = spawn_pos;
 		obj.scale = 1.5f;
 
 		boid_model.setInstance(obj, -1, BOID_MESH_NAME);
-		boid_data.emplace_back(start_speed, dir);
+		boids_data.emplace_back(0, start_speed, dir);
 	}
 	boid_model.updateInstanceBuffer(BOID_MESH_NAME);
-}
-
-void FlockController::updateFlock(float dt) {
-	TAGMesh::BoundingBox margins = { .max = game_bounds.max * 0.87f, .min = game_bounds.min * 0.87f };
-	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
-	std::vector<TAGModel::Object> new_boids(boids.size());
-	std::vector<BoidMovement> new_boids_movements(boids.size());
 
 	generateOctree();
+}
+
+FlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds) :
+	parent_index(parent_index), depth(depth), bounds(bounds)
+{
+	const glm::vec3 c = (bounds.min + bounds.max) / 2.0f;
+	const glm::vec3 disp_to_max = bounds.max - c;
+
+	loose_bounds.max = c + disp_to_max * OCTREE_LOOSE_BOUNDS_FAC;
+	loose_bounds.min = c - disp_to_max * OCTREE_LOOSE_BOUNDS_FAC;
+
+	boid_indices.reserve(OCTREE_MAX_BOIDS);
+}
+
+
+void FlockController::updateFlock(float dt) {
+	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * BORDER_BOUNDS_FAC, .min = game_bounds.min * BORDER_BOUNDS_FAC };
+	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
+	std::vector<TAGModel::Object> new_boids(boids.size());
+	std::vector<BoidData> new_boids_data(boids.size());
+	std::vector<size_t> movers;
 
 	for (size_t i = 0; i < boids.size(); i++) {
 		const auto& boid = boids[i];
-		const auto& boid_movement = boid_data[i];
-
-		std::vector<size_t> leaves, index_stack;
-		index_stack.push_back(0);
-		while (!index_stack.empty()) {
-			const size_t index = index_stack.back();
-			const OctreeNode& node = octree[index];
-			index_stack.pop_back();
-
-			const glm::vec3 bounded_disp = boid.position - glm::clamp(boid.position, node.bounds.min, node.bounds.max);
-			const float bounded_dist_sqr = glm::dot(bounded_disp, bounded_disp);
-
-			if (bounded_dist_sqr < visible_range) {
-				if (node.is_leaf) {
-					leaves.push_back(index);
-				}
-				else {
-					index_stack.insert(index_stack.end(), node.indices.begin(), node.indices.end());
-				}
-			}
-		}
+		const auto& boid_data = boids_data[i];
 
 		glm::vec3 move_away{}, vel_avg{}, pos_avg{};
 		int visible_boids = 0;
 
-		for (size_t leaf_index : leaves) {
-			for (size_t j : octree[leaf_index].indices) {
-				if (i == j) continue;
+		for (size_t j : octree[boid_data.leaf].boid_indices) {
+			if (i == j) continue;
 
-				const auto& other_boid = boids[j];
-				const auto& other_boid_movement = boid_data[j];
-				const glm::vec3 dist = boid.position - other_boid.position;
-				const float length_sqr = glm::dot(dist, dist);
+			const auto& other_boid = boids[j];
+			const auto& other_boid_movement = boids_data[j];
+			const glm::vec3 dist = boid.position - other_boid.position;
+			const float length_sqr = glm::dot(dist, dist);
 
-				if (length_sqr < visible_range) {
-					vel_avg += other_boid_movement.direction * other_boid_movement.speed;
-					pos_avg += other_boid.position;
-					visible_boids++;
+			if (length_sqr < visible_range) {
+				vel_avg += other_boid_movement.direction * other_boid_movement.speed;
+				pos_avg += other_boid.position;
+				visible_boids++;
 
-					if (length_sqr < protected_range) move_away += dist;
-				};
-			}
+				if (length_sqr < protected_range) move_away += dist;
+			};
 		}
 
-		BoidMovement new_boid_movement = boid_movement;
-		glm::vec3 boid_vel = boid_movement.direction * boid_movement.speed;
+		BoidData new_boid_data = boid_data;
+		glm::vec3 boid_vel = boid_data.direction * boid_data.speed;
 		if (visible_boids > 0) {
 			boid_vel += (
 				((vel_avg / (float)visible_boids) - boid_vel) * alignment_factor + 
@@ -103,23 +95,98 @@ void FlockController::updateFlock(float dt) {
 		if (move_away != glm::vec3(0.0f)) {
 			boid_vel += move_away * separation_factor * dt;
 		}
-		boid_vel += (glm::clamp(boid.position, margins.min, margins.max) - boid.position) * turn_factor * dt;
+		boid_vel += (glm::clamp(boid.position, margins.min, margins.max) - boid.position) * border_factor * dt;
 
 		const float length = glm::length(boid_vel);
-		new_boid_movement.speed = glm::clamp(length, min_speed, max_speed);
-		new_boid_movement.direction = (length == 0.0f ? boid_movement.direction : boid_vel / length);
+		new_boid_data.speed = glm::clamp(length, min_speed, max_speed);
+		new_boid_data.direction = (length == 0.0f ? boid_data.direction : boid_vel / length);
 
-		TAGModel::Object new_boid = pointDirection(START_DIR, new_boid_movement.direction);
+		TAGModel::Object new_boid = pointDirection(new_boid_data.direction);
 		new_boid.scale = boid.scale;
-		new_boid.position = boid.position + new_boid_movement.direction * new_boid_movement.speed * dt;
+		new_boid.position = boid.position + new_boid_data.direction * new_boid_data.speed * dt;
+
+		if (!octree[boid_data.leaf].loose_bounds.collisionPoint(new_boid.position)) movers.push_back(i);
 
 		new_boids[i] = new_boid;
-		new_boids_movements[i] = new_boid_movement;
+		new_boids_data[i] = new_boid_data;
 	}
 
 	boid_model.setAllInstances(new_boids, BOID_MESH_NAME);
 	boid_model.updateInstanceBuffer(BOID_MESH_NAME);
-	boid_data = new_boids_movements;
+	boids_data = new_boids_data;
+	const auto& current_boids = boid_model.getAllInstances(BOID_MESH_NAME);
+
+	// Deal with boids moving to other octree cells
+	for (size_t boid_index : movers) {
+		BoidData& boid_data = boids_data[boid_index];
+
+		// Remove boid from old leaf
+		const size_t old_leaf_index = boid_data.leaf;
+		OctreeNode& old_leaf = octree[boid_data.leaf];
+		old_leaf.boid_indices.erase(std::find(old_leaf.boid_indices.begin(), old_leaf.boid_indices.end(), boid_index));
+
+		// Find new home for boid
+		const size_t new_leaf_index = getBoidLeaf(current_boids[boid_index].position, 0);
+		octree[new_leaf_index].boid_indices.push_back(boid_index);
+		boid_data.leaf = new_leaf_index;
+
+		// Merging
+		if (old_leaf_index > 0) {
+			OctreeNode& parent_node = octree[old_leaf.parent_index];
+			bool children_all_leaf = true;
+			for (size_t i = 0; i < 8; i++) {
+				OctreeNode& child_node = octree[parent_node.first_child_index + i];
+
+				if (!child_node.isLeaf()) {
+					children_all_leaf = false;
+					break;
+				}
+
+				parent_node.boid_indices.insert(parent_node.boid_indices.end(), child_node.boid_indices.begin(), child_node.boid_indices.end());
+			}
+
+			if (children_all_leaf && parent_node.boid_indices.size() <= OCTREE_MAX_BOIDS / 2) {
+				free_intervals.push_back(parent_node.first_child_index);
+				parent_node.first_child_index = 0;
+
+				for (size_t boid_index : parent_node.boid_indices) boids_data[boid_index].leaf = old_leaf.parent_index;
+			}
+			else {
+				parent_node.boid_indices.clear();
+			}
+		}
+
+		// Splitting
+		std::vector<size_t> split_cascade_stack{ new_leaf_index };
+		while (!split_cascade_stack.empty()) {
+			const size_t node_index = split_cascade_stack.back();
+			OctreeNode& node = octree[node_index];
+			split_cascade_stack.pop_back();
+
+			if (node.boid_indices.size() > OCTREE_MAX_BOIDS && node.depth <= OCTREE_MAX_DEPTH) {
+				auto child_bounds = splitNode(node.bounds);
+				if (!free_intervals.empty()) {
+					node.first_child_index = free_intervals.back();
+					free_intervals.pop_back();
+					for (size_t i = 0; i < 8; i++) octree[node.first_child_index + i] = OctreeNode(node_index, node.depth + 1, child_bounds[i]);
+				}
+				else {
+					node.first_child_index = octree.size();
+					for (size_t i = 0; i < 8; i++) octree.emplace_back(node_index, node.depth + 1, child_bounds[i]);
+				}
+
+				for (size_t boid_index : node.boid_indices) {
+					const size_t leaf_index = getBoidLeaf(current_boids[boid_index].position, node_index);
+					octree[leaf_index].boid_indices.push_back(boid_index);
+
+					if (octree[leaf_index].boid_indices.size() == OCTREE_MAX_BOIDS) split_cascade_stack.push_back(leaf_index);
+
+					boids_data[boid_index].leaf = leaf_index;
+				}
+				node.boid_indices.clear();
+			}
+		}
+	}
 }
 
 void FlockController::drawAll(const TAGShaderManager::Shader& shader) {
@@ -128,76 +195,83 @@ void FlockController::drawAll(const TAGShaderManager::Shader& shader) {
 
 void FlockController::generateOctree() {
 	octree.clear();
-	
+	octree.emplace_back(0, 0, game_bounds);
+
+	std::vector<size_t> octree_build_stack;
+
 	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
 
-	std::vector<size_t> indices(boids.size());
-	for (size_t i = 0; i < boids.size(); i++) indices[i] = i;
+	std::unordered_map<size_t, std::vector<size_t>> parent_boids;
+	parent_boids[0] = std::vector<size_t>(boids.size());
+	for (size_t i = 0; i < boids.size(); i++) parent_boids[0][i] = i;
 
-	size_t id = 0;
-
-	if (indices.size() > OCTREE_MAX_BOIDS) {
-		auto child_nodes = splitNode(game_bounds);
-
-		std::vector<size_t> child_indices(8);
+	if (boids.size() > OCTREE_MAX_BOIDS) {
+		octree[0].first_child_index = 1;
+		auto child_bounds = splitNode(game_bounds);
 		for (size_t i = 0; i < 8; i++) {
-			child_indices[i] = ++id;
-			recursiveOctreeStep(boids, child_nodes[i], indices, id);
+			octree_build_stack.push_back(i + 1);
+			octree.emplace_back(0, 1, child_bounds[i]);
 		}
-
-		octree.emplace_back(0, game_bounds, child_indices, false);
-	}
+	} 
 	else {
-		octree.emplace_back(0, game_bounds, indices, true);
+		octree[0].boid_indices = parent_boids[0];
 	}
 
-	std::sort(octree.begin(), octree.end(), [](const OctreeNode& a, const OctreeNode& b) { return a.id < b.id; });
-}
+	while (!octree_build_stack.empty()) {
+		const size_t node_index = octree_build_stack.back();
+		OctreeNode& node = octree[node_index];
+		octree_build_stack.pop_back();
 
-void FlockController::recursiveOctreeStep(const std::vector<TAGModel::Object>& boids, TAGMesh::BoundingBox& bounds, std::vector<size_t>& indices, size_t& id) {
-	const size_t next_id = id;
-	std::vector<size_t> inside_indices, outside_indices;
+		std::vector<size_t> leftover_boids;
+		for (size_t boid_index : parent_boids[node.parent_index]) {
+			const glm::vec3& pos = boids[boid_index].position;
 
-	glm::vec3 min = (bounds.max + bounds.min) / 2.0f, max = (bounds.max + bounds.min) / 2.0f;
-	for (size_t index : indices) {
-		const glm::vec3& pos = boids[index].position;
-		if (bounds.collisionPoint(pos)) {
-			inside_indices.push_back(index);
-			min = glm::min(pos, min);
-			max = glm::max(pos, max);
+			if (node.bounds.collisionPoint(pos)) {
+				node.boid_indices.push_back(boid_index);
+			}
+			else {
+				leftover_boids.push_back(boid_index);
+			}
 		}
+		parent_boids[node.parent_index] = leftover_boids;
+
+		if (node.boid_indices.size() > OCTREE_MAX_BOIDS && node.depth <= OCTREE_MAX_DEPTH) {
+			parent_boids[node_index] = node.boid_indices;
+			node.boid_indices.clear();
+			node.first_child_index = octree.size();
+			auto child_bounds = splitNode(node.bounds);
+			for (size_t i = 0; i < 8; i++) {
+				octree_build_stack.push_back(octree.size());
+				octree.emplace_back(node_index, node.depth + 1, child_bounds[i]);
+			}
+		} 
 		else {
-			outside_indices.push_back(index);
+			for (size_t boid_index : node.boid_indices) boids_data[boid_index].leaf = node_index;
 		}
-	}
-	bounds.min = min;
-	bounds.max = max;
-	indices = std::move(outside_indices);
-	outside_indices.clear();
-	outside_indices.shrink_to_fit();
-
-	if (inside_indices.size() > OCTREE_MAX_BOIDS) {
-		auto child_nodes = splitNode(bounds);
-
-		std::vector<size_t> child_indices(8);
-		for (size_t i = 0; i < 8; i++) {
-			child_indices[i] = ++id;
-			recursiveOctreeStep(boids, child_nodes[i], inside_indices, id);
-		}
-
-		octree.emplace_back(next_id, bounds, child_indices, false);
-	}
-	else {
-		octree.emplace_back(next_id, bounds, inside_indices, true);
 	}
 }
 
-TAGModel::Object FlockController::pointDirection(const glm::vec3& old_direction, const glm::vec3& new_direction) {
-	const glm::vec3 cross = glm::cross(old_direction, new_direction);
+size_t FlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
+	pos = glm::clamp(pos, game_bounds.min, game_bounds.max);
+
+	size_t idx = start_node;
+	while (!octree[idx].isLeaf()) {
+		const TAGMesh::BoundingBox& b = octree[idx].bounds;
+		const glm::vec3 c = (b.min + b.max) * 0.5f;
+		idx = octree[idx].first_child_index
+			+ (pos.x >= c.x ? 1 : 0)
+			+ (pos.y >= c.y ? 2 : 0)
+			+ (pos.z >= c.z ? 4 : 0);
+	}
+	return idx;
+}
+
+TAGModel::Object FlockController::pointDirection(const glm::vec3& new_direction) {
+	const glm::vec3 cross = glm::cross(START_DIR, new_direction);
 	const float cross_length = glm::length(cross);
 	return {
 		.rotation_axis = (cross_length > 0.0f ? cross / cross_length : START_DIR),
-		.angle = std::atan2(cross_length, glm::dot(old_direction, new_direction))
+		.angle = std::atan2(cross_length, glm::dot(START_DIR, new_direction))
 	};
 }
 
