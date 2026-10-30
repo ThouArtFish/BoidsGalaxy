@@ -2,15 +2,15 @@
 
 #include <ModelClass.hpp>
 
-class FlockController {
+class ClientFlockController {
 public:
 	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.05f;
-	float protected_range = 25.0f, visible_range = 625.0f;
+	float protected_range = 25.0f, visible_range = 900.0f;
 	float border_factor = 0.2f;
-	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(300.0f), .min = glm::vec3(-300.0f) };
+	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(400.0f), .min = glm::vec3(-400.0f) };
 	float min_speed = 20.0f, max_speed = 60.0f;
 
-	FlockController(size_t boid_count);
+	ClientFlockController(size_t boid_count);
 	void updateFlock(float dt);
 	void drawAll(const TAGShaderManager::Shader& shader);
 private:

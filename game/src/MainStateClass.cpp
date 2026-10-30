@@ -3,6 +3,11 @@
 MainState::MainState() {
 	TAGBaseState::far = 800.0f;
 
+	shaders.addShader<ProgramType::Default>({
+		{ main_shader, "", TAGShaderManager::DefaultProgramType::INSTANCED_MODEL_DRAW },
+		{ skybox_shader, "", TAGShaderManager::DefaultProgramType::SKYBOX_DRAW }
+	});
+
 	planet_manager.generatePlanets();
 
 	sunlight.setLight({ .direction = { 1.0f, 0.0f, 0.0f }, .colour = { 1.0f, 1.0f, 1.0f } });

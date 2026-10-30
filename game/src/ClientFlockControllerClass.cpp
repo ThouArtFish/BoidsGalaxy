@@ -1,6 +1,6 @@
-#include "../include/FlockControllerClass.hpp"
+#include "../include/ClientFlockControllerClass.hpp"
 
-FlockController::FlockController(size_t boid_count) {
+ClientFlockController::ClientFlockController(size_t boid_count) {
 	static const std::vector<TAGMesh::Vertex> vertices = {
 		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
 		{ glm::vec3(1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
@@ -40,7 +40,7 @@ FlockController::FlockController(size_t boid_count) {
 	generateOctree();
 }
 
-FlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds) :
+ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds) :
 	parent_index(parent_index), depth(depth), bounds(bounds)
 {
 	const glm::vec3 c = (bounds.min + bounds.max) / 2.0f;
@@ -53,7 +53,7 @@ FlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const
 }
 
 
-void FlockController::updateFlock(float dt) {
+void ClientFlockController::updateFlock(float dt) {
 	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * BORDER_BOUNDS_FAC, .min = game_bounds.min * BORDER_BOUNDS_FAC };
 	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
 	std::vector<TAGModel::Object> new_boids(boids.size());
@@ -188,11 +188,11 @@ void FlockController::updateFlock(float dt) {
 	}
 }
 
-void FlockController::drawAll(const TAGShaderManager::Shader& shader) {
+void ClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {
 	boid_model.drawAll(shader, BOID_MESH_NAME, { .cull_backface = false });
 }
 
-void FlockController::generateOctree() {
+void ClientFlockController::generateOctree() {
 	octree.clear();
 	octree.emplace_back(0, 0, game_bounds);
 
@@ -234,7 +234,7 @@ void FlockController::generateOctree() {
 		}
 		parent_boids[node.parent_index] = leftover_boids;
 
-		if (node.boid_indices.size() > OCTREE_MAX_BOIDS && node.depth <= OCTREE_MAX_DEPTH) {
+		if (node.boid_indices.size() > OCTREE_MAX_BOIDS && node.depth < OCTREE_MAX_DEPTH) {
 			parent_boids[node_index] = node.boid_indices;
 			node.boid_indices.clear();
 			node.first_child_index = octree.size();
@@ -250,7 +250,7 @@ void FlockController::generateOctree() {
 	}
 }
 
-size_t FlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
+size_t ClientFlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
 	pos = glm::clamp(pos, game_bounds.min, game_bounds.max);
 
 	size_t idx = start_node;
@@ -265,7 +265,7 @@ size_t FlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
 	return idx;
 }
 
-TAGModel::Object FlockController::pointDirection(const glm::vec3& new_direction) {
+TAGModel::Object ClientFlockController::pointDirection(const glm::vec3& new_direction) {
 	const glm::vec3 cross = glm::cross(START_DIR, new_direction);
 	const float cross_length = glm::length(cross);
 	return {
@@ -274,7 +274,7 @@ TAGModel::Object FlockController::pointDirection(const glm::vec3& new_direction)
 	};
 }
 
-std::array<TAGMesh::BoundingBox, 8> FlockController::splitNode(const TAGMesh::BoundingBox& node) {
+std::array<TAGMesh::BoundingBox, 8> ClientFlockController::splitNode(const TAGMesh::BoundingBox& node) {
 	const glm::vec3 c = (node.max + node.min) / 2.0f;
 	std::array<TAGMesh::BoundingBox, 8> child_nodes{};
 	for (size_t i = 0; i < 8; i++) {

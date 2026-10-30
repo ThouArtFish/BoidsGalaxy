@@ -7,7 +7,8 @@
 #include <SkyboxClass.hpp>
 #include <UtilClass.hpp>
 #include "TAMPlayerController.hpp"
-#include "FlockControllerClass.hpp"
+#include "ClientFlockControllerClass.hpp"
+#include "ComputeFlockControllerClass.hpp"
 #include "PlanetManagerClass.hpp"
 
 class MainState : public TAGBaseState {
@@ -22,7 +23,7 @@ public:
 private:
 	static constexpr float SPEED = 70.0f;
 	static constexpr float AMBIENCE = 0.4f;
-	static constexpr size_t BOID_COUNT = 8000;
+	static constexpr size_t BOID_COUNT = 6400;
 	static constexpr size_t PLANET_COUNT = 5;
 
 	inline static const std::string main_shader = "main";
@@ -31,14 +32,11 @@ private:
 	inline static const std::vector<std::string> shader_names = { main_shader, skybox_shader };
 
 	TAM::PlayerController player_controller;
-	FlockController flock_controller = FlockController(BOID_COUNT);
-	PlanetManager planet_manager = PlanetManager(PLANET_COUNT);
-	TAGSkybox skybox = TAGSkybox("space_skybox.png");
-	TAGLightManager<TAGLight::Ray> sunlight = TAGLightManager<TAGLight::Ray>(TAGResourceManager::BufferAccess::STATIC, 1);
-	TAGShaderManager shaders = TAGShaderManager({ 
-		{ .name = main_shader, .shader_type = TAGShaderManager::ShaderType::INSTANCED_MODEL_DRAW },
-		{ .name = skybox_shader, .shader_type = TAGShaderManager::ShaderType::SKYBOX_DRAW }
-	});
+	ComputeFlockController flock_controller{ BOID_COUNT };
+	PlanetManager planet_manager{ PLANET_COUNT };
+	TAGSkybox skybox{ "space_skybox.png" };
+	TAGLightManager<TAGLight::Ray> sunlight{ TAGResourceManager::BufferAccess::STATIC, 1 };
+	TAGShaderManager shaders;
 
 	void setCameraMatrix() const;
 	void setProjectiveMatrix() const;
