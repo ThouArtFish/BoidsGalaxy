@@ -2,6 +2,7 @@
 
 MainState::MainState() {
 	TAGBaseState::far = 800.0f;
+	frame_interval = 0.0f;
 
 	shaders.addShader<ProgramType::Default>({
 		{ main_shader, "", TAGShaderManager::DefaultProgramType::INSTANCED_MODEL_DRAW },
@@ -11,7 +12,7 @@ MainState::MainState() {
 	planet_manager.generatePlanets();
 
 	sunlight.setLight({ .direction = { 1.0f, 0.0f, 0.0f }, .colour = { 1.0f, 1.0f, 1.0f } });
-	sunlight.bindToShader();
+	sunlight.updateLightBuffer();
 
 	shaders.useShader(main_shader).set(TAGShaderManager::default_options.ambience, AMBIENCE);
 	setProjectiveMatrix();
@@ -39,6 +40,7 @@ std::string MainState::mainLoop() {
 
 	flock_controller.updateFlock((float)delta_time);
 
+	sunlight.bindToShader();
 	const auto& shader = shaders.useShader(main_shader);
 	flock_controller.drawAll(shader);
 	planet_manager.drawAll(shader);

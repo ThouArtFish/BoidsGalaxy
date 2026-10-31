@@ -7,8 +7,8 @@ struct Constants {
   float protected_range_sqr, visible_range_sqr;
   float border_factor;
   float min_speed, max_speed;
-  uint total_boids;
   vec3 max_margin;
+  uint total_boids;
   float dt;
 };
 struct BoidInstance {
@@ -40,7 +40,7 @@ layout(std430, binding = 2) readonly buffer data_boids_in {
 layout(std430, binding = 3) writeonly buffer data_boids_out {
   BoidData[] write_data_boids;
 };
-layout(std140, binding = 4) readonly uniform boids_constants {
+layout(std140, binding = 4) uniform boids_constants {
   Constants constants;
 };
 

@@ -1,29 +1,29 @@
 #include "../include/ComputeFlockControllerClass.hpp"
 
 ComputeFlockController::ComputeFlockController(size_t boid_count) :
-	boids_instance(boid_count, 3, TAGResourceManager::BufferAccess::STREAM),
-	boids_data(boid_count, 3, TAGResourceManager::BufferAccess::STREAM),
-	boids_map(boid_count, 5, TAGResourceManager::BufferAccess::STREAM),
+	boids_instance(boid_count, TAGResourceManager::BufferAccess::STREAM),
+	boids_data(boid_count, TAGResourceManager::BufferAccess::STREAM),
 	boids_constants(1, 1, TAGResourceManager::BufferAccess::STREAM)
 {
 	// Compile shaders
 	shaders.addShader<ProgramType::Compute>(ProgramType::Compute{ COMPUTE_BOID_UPDATE_NAME, "BoidUpdateCompute.glsl" });
 
 	// Calculate game bounds
+	/*
 	const float visible_range = glm::sqrt(BoidConstants{}.visible_range_sqr);
 	for (size_t i = 0; i < 3; i++) {
 		game_bounds.max[i] = (float)CELLS_PER_AXIS[i] * visible_range;
 		game_bounds.min[i] = -game_bounds.max[i];
 	}
+	*/
 
 	// Instantiate constants
-	constants = { .total_boids = (GLuint)boid_count, .max_margin = game_bounds.max * GAME_BOUNDS_MARGIN, .dt = 1.0f / 60.0f };
+	constants = { .max_margin = game_bounds.max * GAME_BOUNDS_MARGIN, .total_boids = (GLuint)boid_count, .dt = 1.0f / 60.0f };
 
 	// Instantiate boid data
 	const float start_speed = (constants.min_speed + constants.max_speed) / 2.0f;
 	std::vector<TAGModel::ShaderObject> boid_inst(boid_count);
 	std::vector<BoidObject> boid_objs(boid_count);
-	std::vector<BoidKeyValue> map_objs(boid_count);
 	for (size_t i = 0; i < boid_count; i++) {
 		// Generate instance data
 		const glm::vec3 spawn_pos = {
@@ -50,11 +50,9 @@ ComputeFlockController::ComputeFlockController(size_t boid_count) :
 			dir,
 			start_speed
 		};
-		map_objs[i] = { mortonCodeFromCell(glm::floor((spawn_pos - game_bounds.min) / glm::vec3(CELLS_PER_AXIS))), (GLuint)i };
 	}
-	boids_instance.updateBuffer(boid_inst);
-	boids_data.updateBuffer(boid_objs);
-	boids_map.updateBuffer(map_objs);
+	boids_instance.updateReadBuffer(boid_inst);
+	boids_data.updateReadBuffer(boid_objs);
 
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
@@ -65,47 +63,35 @@ void ComputeFlockController::updateFlock(float dt) {
 	boids_constants.updateBuffer({ constants });
 	glMemoryBarrier(GL_UNIFORM_BARRIER_BIT);
 
-	// Bind buffers to compute shader and increment regions
-	const GLintptr instance_write_fence = (boids_instance.getCurrentFence() + 1 == boids_instance.max_fences ? 0 : boids_instance.getCurrentFence() + 1);
-	const GLintptr data_write_fence = (boids_data.getCurrentFence() + 1 == boids_data.max_fences ? 0 : boids_data.getCurrentFence() + 1);
-
-	boids_instance.bindToShader(0, TAGResourceManager::ShaderBufferType::SHADER_STORAGE, boids_instance.getInternalOffset());
-	boids_instance.bindToShader(1, TAGResourceManager::ShaderBufferType::SHADER_STORAGE, instance_write_fence * sizeof(TAGModel::ShaderObject) * boids_instance.getMaxObjects());
-
-	boids_data.bindToShader(2, TAGResourceManager::ShaderBufferType::SHADER_STORAGE, boids_data.getInternalOffset());
-	boids_data.bindToShader(3, TAGResourceManager::ShaderBufferType::SHADER_STORAGE, data_write_fence * sizeof(BoidObject) * boids_data.getMaxObjects());
-
+	// Bind buffers to compute shader
+	boids_instance.bindReadWrite(0, 1);
+	boids_data.bindReadWrite(2, 3);
 	boids_constants.bindToShader(4, TAGResourceManager::ShaderBufferType::UNIFORM, 0);
-
-	boids_instance.incrementFence();
-	boids_data.incrementFence();
 
 	// Dispatch compute
 	shaders.useShader(COMPUTE_BOID_UPDATE_NAME);
 	glDispatchCompute(glm::ceil((GLfloat)constants.total_boids / 64.0f), 1, 1);
+	shaders.stopShader();
+
+	// Unbind buffer
+	boids_instance.unbindReadWrite();
+	boids_data.unbindReadWrite();
+	boids_constants.unbindFromShader(4, TAGResourceManager::ShaderBufferType::UNIFORM);
+
+	// Swap read and write buffers
+	boids_instance.switchBuffers();
+	boids_data.switchBuffers();
 
 	// First since buffer is attached to VAO for instance data, second since ranges will be written to on later frames
 	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 void ComputeFlockController::drawAll(const TAGShaderManager::Shader& shader) {
-	/*
-	boids_instance.bindToVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID(), boids_instance.getInternalOffset());
-	boid_mesh.draw(shader, {}, boids_instance.getMaxObjects());
-	*/
+	glDisable(GL_CULL_FACE);
+	PingPongBuffer<TAGModel::ShaderObject>::Buffer& inst_buffer = boids_instance.getWriteBuffer();
+	inst_buffer.bindToVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID(), 0);
+	boid_mesh.draw(shader, {}, inst_buffer.getMaxObjects());
+	inst_buffer.unbindFromVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID());
+	glEnable(GL_CULL_FACE);
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
-
-GLuint ComputeFlockController::mortonCodeFromCell(glm::uvec3 cell) {
-	GLuint code = 0;
-	for (size_t i = 0; i < 3; i++) {
-		GLuint& v = cell[i];
-		v &= 0x3FF;
-		v = (v | (v << 16)) & 0x030000FF;
-		v = (v | (v << 8)) & 0x0300F00F;
-		v = (v | (v << 4)) & 0x030C30C3;
-		v = (v | (v << 2)) & 0x09249249;
-		code |= (i == 0 ? v : v << i);
-	}
-	return code;
-}
-
