@@ -1,8 +1,10 @@
 #include "../include/MainStateClass.hpp"
 
 MainState::MainState() {
-	TAGBaseState::far = 800.0f;
+	TAGBaseState::far = 1000.0f;
 	frame_interval = 0.0f;
+
+	imgui_handler.createContext(TAGBaseState::window);
 
 	shaders.addShader<ProgramType::Default>({
 		{ main_shader, "", TAGShaderManager::DefaultProgramType::INSTANCED_MODEL_DRAW },
@@ -19,7 +21,7 @@ MainState::MainState() {
 }
 
 void MainState::mouseCallback() {
-	camera_direction = player_controller.cameraDirection();
+	if (mouse_locked) camera_direction = player_controller.cameraDirection();
 }
 
 void MainState::framebufferSizeCallback() {
@@ -27,24 +29,32 @@ void MainState::framebufferSizeCallback() {
 }
 
 std::string MainState::mainLoop() {
-	if (getKeyState(GLFW_KEY_ESCAPE)) return "END";
+	imgui_handler.startFrame(flock_controller.get());
 
-	if (getKeyState(GLFW_KEY_P) == 1) {
-		setWindowFullscreen(TAGEnum::TOGGLE);
+	if (getKeyState(GLFW_KEY_ESCAPE)) {
+		imgui_handler.destroyContext();
+		return "END";
+	} 
+
+	if (getKeyState(GLFW_KEY_G) == 1) {
 		setMouseLock(TAGEnum::TOGGLE);
+		mouse_locked = !mouse_locked;
 	}
+
+	if (getKeyState(GLFW_KEY_F) == 1) setWindowFullscreen(TAGEnum::TOGGLE);
 
 	camera_position += player_controller.playerDirection(camera_direction, glm::vec3(0.0f)) * SPEED * (float)delta_time;
 
 	setCameraMatrix();
 
-	flock_controller.updateFlock((float)delta_time);
+	flock_controller->updateFlock((float)delta_time);
 
 	sunlight.bindToShader();
 	const auto& shader = shaders.useShader(main_shader);
-	flock_controller.drawAll(shader);
+	flock_controller->drawAll(shader);
 	planet_manager.drawAll(shader);
 	skybox.draw(shaders.useShader(skybox_shader));
+	imgui_handler.draw();
 
 	return "CURRENT";
 }

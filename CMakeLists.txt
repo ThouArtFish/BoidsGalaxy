@@ -23,6 +23,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(TAGEngine)
 
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/game/vendor/imgui/*.cpp
     ${PROJECT_SOURCE_DIR}*.cpp
     ${PROJECT_SOURCE_DIR}*.c
 )

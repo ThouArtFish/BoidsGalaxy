@@ -1,18 +1,9 @@
 #include "../include/ClientFlockControllerClass.hpp"
 
 ClientFlockController::ClientFlockController(size_t boid_count) {
-	static const std::vector<TAGMesh::Vertex> vertices = {
-		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
-		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() },
-		{ glm::vec3(0.0f, -1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() },
-		{ glm::vec3(0.0f, -1.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() }
-	};
-	static const std::vector<TAGMesh::Fragment> fragments = { { 0, 1, 2 }, { 3, 4, 5 } };
 	const float start_speed = (max_speed - min_speed) / 2.0f;
 
-	boid_model.addMesh(BOID_MESH_NAME, vertices, fragments, { .colour = glm::vec3(1.0f, 0.0f, 0.0f) });
+	boid_model.addMesh(BOID_MESH_NAME, MESH_VERTICES, MESH_INDICES, MESH_MAT);
 	boids_data.reserve(boid_count);
 	for (size_t i = 0; i < boid_count; i++) {
 		const glm::vec3 spawn_pos = {
@@ -54,7 +45,7 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 
 
 void ClientFlockController::updateFlock(float dt) {
-	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * BORDER_BOUNDS_FAC, .min = game_bounds.min * BORDER_BOUNDS_FAC };
+	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * border_start_factor, .min = game_bounds.min * border_start_factor };
 	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
 	std::vector<TAGModel::Object> new_boids(boids.size());
 	std::vector<BoidData> new_boids_data(boids.size());
@@ -75,12 +66,12 @@ void ClientFlockController::updateFlock(float dt) {
 			const glm::vec3 dist = boid.position - other_boid.position;
 			const float length_sqr = glm::dot(dist, dist);
 
-			if (length_sqr < visible_range) {
+			if (length_sqr < visible_range * visible_range) {
 				vel_avg += other_boid_movement.direction * other_boid_movement.speed;
 				pos_avg += other_boid.position;
 				visible_boids++;
 
-				if (length_sqr < protected_range) move_away += dist;
+				if (length_sqr < protected_range * protected_range) move_away += dist;
 			};
 		}
 

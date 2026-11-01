@@ -3,25 +3,14 @@
 ComputeFlockController::ComputeFlockController(size_t boid_count) :
 	boids_instance(boid_count, TAGResourceManager::BufferAccess::STREAM),
 	boids_data(boid_count, TAGResourceManager::BufferAccess::STREAM),
-	boids_constants(1, 1, TAGResourceManager::BufferAccess::STREAM)
+	boids_constants(1, 1, TAGResourceManager::BufferAccess::STREAM),
+	total_boids(boid_count)
 {
 	// Compile shaders
 	shaders.addShader<ProgramType::Compute>(ProgramType::Compute{ COMPUTE_BOID_UPDATE_NAME, "BoidUpdateCompute.glsl" });
 
-	// Calculate game bounds
-	/*
-	const float visible_range = glm::sqrt(BoidConstants{}.visible_range_sqr);
-	for (size_t i = 0; i < 3; i++) {
-		game_bounds.max[i] = (float)CELLS_PER_AXIS[i] * visible_range;
-		game_bounds.min[i] = -game_bounds.max[i];
-	}
-	*/
-
-	// Instantiate constants
-	constants = { .max_margin = game_bounds.max * GAME_BOUNDS_MARGIN, .total_boids = (GLuint)boid_count, .dt = 1.0f / 60.0f };
-
 	// Instantiate boid data
-	const float start_speed = (constants.min_speed + constants.max_speed) / 2.0f;
+	const float start_speed = (min_speed + max_speed) / 2.0f;
 	std::vector<TAGModel::ShaderObject> boid_inst(boid_count);
 	std::vector<BoidObject> boid_objs(boid_count);
 	for (size_t i = 0; i < boid_count; i++) {
@@ -42,7 +31,7 @@ ComputeFlockController::ComputeFlockController(size_t boid_count) :
 
 		boid_inst[i] = {
 			spawn_pos,
-			BOID_SCALE,
+			boid_scale,
 			glm::vec3(axis_and_angle),
 			axis_and_angle.w
 		};
@@ -57,10 +46,23 @@ ComputeFlockController::ComputeFlockController(size_t boid_count) :
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
+ComputeFlockController::BoidConstants::BoidConstants(ComputeFlockController* self, float dt) {
+	separation_factor = self->separation_factor;
+	alignment_factor = self->alignment_factor;
+	cohesion_factor = self->cohesion_factor;
+	protected_range_sqr = self->protected_range * self->protected_range;
+	visible_range_sqr = self->visible_range * self->visible_range;
+	border_factor = self->border_factor;
+	min_speed = self->min_speed;
+	max_speed = self->max_speed;
+	max_margin = self->game_bounds.max * self->border_start_factor;
+	total_boids = self->total_boids;
+	this->dt = dt;
+}
+
 void ComputeFlockController::updateFlock(float dt) {
 	// Update constants and wait for completion
-	constants.dt = dt;
-	boids_constants.updateBuffer({ constants });
+	boids_constants.updateBuffer({ BoidConstants(this, dt) });
 	glMemoryBarrier(GL_UNIFORM_BARRIER_BIT);
 
 	// Bind buffers to compute shader
@@ -70,7 +72,7 @@ void ComputeFlockController::updateFlock(float dt) {
 
 	// Dispatch compute
 	shaders.useShader(COMPUTE_BOID_UPDATE_NAME);
-	glDispatchCompute(glm::ceil((GLfloat)constants.total_boids / 64.0f), 1, 1);
+	glDispatchCompute(glm::ceil((GLfloat)total_boids / 64.0f), 1, 1);
 	shaders.stopShader();
 
 	// Unbind buffer

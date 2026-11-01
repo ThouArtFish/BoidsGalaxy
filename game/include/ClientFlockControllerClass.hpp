@@ -1,18 +1,13 @@
 #pragma once
 
 #include <ModelClass.hpp>
+#include "FlockControllerBase.hpp"
 
-class ClientFlockController {
+class ClientFlockController :  public FlockControllerBase {
 public:
-	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.05f;
-	float protected_range = 25.0f, visible_range = 900.0f;
-	float border_factor = 0.2f;
-	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(350.0f), .min = glm::vec3(-350.0f) };
-	float min_speed = 20.0f, max_speed = 60.0f;
-
 	ClientFlockController(size_t boid_count);
-	void updateFlock(float dt);
-	void drawAll(const TAGShaderManager::Shader& shader);
+	void updateFlock(float dt) override;
+	void drawAll(const TAGShaderManager::Shader& shader) override;
 private:
 	struct BoidData {
 		size_t leaf = 0;
@@ -27,9 +22,6 @@ private:
 		OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds);
 		bool isLeaf() const { return !first_child_index; }
 	};
-	inline static const std::string BOID_MESH_NAME = "boids";
-	inline static const glm::vec3 START_DIR = glm::vec3(0.0f, 1.0f, 0.0f);
-	static constexpr float BORDER_BOUNDS_FAC = 0.87f;
 	static constexpr float OCTREE_LOOSE_BOUNDS_FAC = 1.7f;
 	static constexpr size_t OCTREE_MAX_BOIDS = 15;
 	static constexpr size_t OCTREE_MAX_DEPTH = 5;
