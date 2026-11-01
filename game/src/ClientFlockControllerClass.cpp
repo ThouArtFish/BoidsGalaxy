@@ -1,28 +1,24 @@
 #include "../include/ClientFlockControllerClass.hpp"
 
-ClientFlockController::ClientFlockController(size_t boid_count) {
-	const float start_speed = (max_speed - min_speed) / 2.0f;
-
+ClientFlockController::ClientFlockController(size_t boid_count) : FlockControllerBase(boid_count) {
 	boid_model.addMesh(BOID_MESH_NAME, MESH_VERTICES, MESH_INDICES, MESH_MAT);
 	boids_data.reserve(boid_count);
+	const float start_speed = (max_speed - min_speed) / 2.0f;
 	for (size_t i = 0; i < boid_count; i++) {
 		const glm::vec3 spawn_pos = {
-			TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
-			TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
-			TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
+		TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
+		TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
+		TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
 		};
-
 		glm::vec3 dir = {
 			TAGUtil::randomRangeFloat(-1.0f, 1.0f),
 			TAGUtil::randomRangeFloat(-1.0f, 1.0f),
 			TAGUtil::randomRangeFloat(-1.0f, 1.0f)
 		};
 		dir = glm::normalize((glm::dot(dir, dir) == 0.0f ? glm::vec3(1.0f) : dir));
-
 		TAGModel::Object obj = pointDirection(dir);
 		obj.position = spawn_pos;
-		obj.scale = 1.5f;
-
+		obj.scale = boid_scale;
 		boid_model.setInstance(obj, -1, BOID_MESH_NAME);
 		boids_data.emplace_back(0, start_speed, dir);
 	}
@@ -46,11 +42,50 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 
 void ClientFlockController::updateFlock(float dt) {
 	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * border_start_factor, .min = game_bounds.min * border_start_factor };
+	std::vector<size_t> movers;
+
+	// If boid count has changed, add or remove boids
+	const size_t change_boids = (size_t)glm::abs((int)boid_count - (int)boids_data.size());
+	if (boid_count > boids_data.size()) {
+		const float start_speed = (max_speed - min_speed) / 2.0f;
+		for (size_t i = 0; i < change_boids; i++) {
+			const glm::vec3 spawn_pos = {
+				TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
+				TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
+				TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
+			};
+			size_t leaf_index = getBoidLeaf(spawn_pos, 0);
+			glm::vec3 dir = {
+				TAGUtil::randomRangeFloat(-1.0f, 1.0f),
+				TAGUtil::randomRangeFloat(-1.0f, 1.0f),
+				TAGUtil::randomRangeFloat(-1.0f, 1.0f)
+			};
+			dir = glm::normalize((glm::dot(dir, dir) == 0.0f ? glm::vec3(1.0f) : dir));
+			TAGModel::Object obj = pointDirection(dir);
+			obj.position = spawn_pos;
+			obj.scale = boid_scale;
+
+			movers.push_back(boids_data.size());
+			octree[leaf_index].boid_indices.push_back(boids_data.size());
+			boid_model.setInstance(obj, -1, BOID_MESH_NAME);
+			boids_data.emplace_back(leaf_index, start_speed, dir);
+		}
+	}
+	else if (boid_count < boids_data.size()) {
+		for (size_t i = 0; i < change_boids; i++) {
+			const size_t remove_index = boids_data.size() - 1;
+			const size_t leaf_index = boids_data[remove_index].leaf;
+			octree[leaf_index].boid_indices.erase(std::find(octree[leaf_index].boid_indices.begin(), octree[leaf_index].boid_indices.end(), remove_index));
+			boids_data.pop_back();
+			boid_model.removeInstance(-1, BOID_MESH_NAME);
+		}
+	}
+
 	const auto& boids = boid_model.getAllInstances(BOID_MESH_NAME);
 	std::vector<TAGModel::Object> new_boids(boids.size());
 	std::vector<BoidData> new_boids_data(boids.size());
-	std::vector<size_t> movers;
 
+	// Update boid data
 	for (size_t i = 0; i < boids.size(); i++) {
 		const auto& boid = boids[i];
 		const auto& boid_data = boids_data[i];
@@ -102,6 +137,7 @@ void ClientFlockController::updateFlock(float dt) {
 		new_boids_data[i] = new_boid_data;
 	}
 
+	// Set new boid data
 	boid_model.setAllInstances(new_boids, BOID_MESH_NAME);
 	boid_model.updateInstanceBuffer(BOID_MESH_NAME);
 	boids_data = new_boids_data;

@@ -23,7 +23,8 @@ public:
 	std::string mainLoop() override;
 private:
 	static constexpr float AMBIENCE = 0.4f;
-	static constexpr size_t BOID_COUNT = 8000;
+	static constexpr size_t BOID_COUNT = 100;
+	static constexpr float SPEED = 70.0f;
 	static constexpr size_t PLANET_COUNT = 5;
 
 	inline static const std::string main_shader = "main";

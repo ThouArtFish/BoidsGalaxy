@@ -3,13 +3,13 @@
 #include "PingPongBufferClass.hpp"
 
 template<class T> PingPongBuffer<T>::PingPongBuffer(size_t size, TAGResourceManager::BufferAccess buffer_access) :
-	buffer_a(size, 1, buffer_access), buffer_b(size, 1, buffer_access) 
+	buffer_a(size, 2, buffer_access), buffer_b(size, 2, buffer_access) 
 {
 	buffer_ptrs = { &buffer_a, &buffer_b };
 }
 
-template<class T> void PingPongBuffer<T>::updateReadBuffer(const std::vector<T>& data) {
-	buffer_ptrs[read]->updateBuffer(data);
+template<class T> PingPongBuffer<T>::Buffer& PingPongBuffer<T>::getReadBuffer() {
+	return *buffer_ptrs[read];
 }
 
 template<class T> PingPongBuffer<T>::Buffer& PingPongBuffer<T>::getWriteBuffer() {

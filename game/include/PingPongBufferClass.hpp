@@ -8,7 +8,7 @@ public:
 
 	PingPongBuffer(size_t size, TAGResourceManager::BufferAccess buffer_access);
 
-	void updateReadBuffer(const std::vector<T>& data);
+	Buffer& getReadBuffer();
 	Buffer& getWriteBuffer();
 	void bindReadWrite(GLuint read_index, GLuint write_index);
 	void unbindReadWrite();

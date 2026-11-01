@@ -27,7 +27,6 @@ public:
 	};
 	inline static const std::string COMPUTE_BOID_UPDATE_NAME = "computer_boid_update";
 	inline static const glm::uvec3 CELLS_PER_AXIS = { 10, 10, 10 };
-	const GLuint total_boids;
 
 	ComputeFlockController(size_t boid_count);
 	void updateFlock(float dt) override;
