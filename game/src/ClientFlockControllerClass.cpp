@@ -41,6 +41,9 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 
 
 void ClientFlockController::updateFlock(float dt) {
+	const auto query_result = query_manager.poll();
+	if (query_result.time_in_ns >= 0) render_timer.addUpdateTime(query_result.time_in_ns / 1.0e9);
+
 	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * border_start_factor, .min = game_bounds.min * border_start_factor };
 	std::vector<size_t> movers;
 	const double time = glfwGetTime();
@@ -214,11 +217,13 @@ void ClientFlockController::updateFlock(float dt) {
 		}
 	}
 
-	addUpdateTime(glfwGetTime() - time);
+	update_timer.addUpdateTime(glfwGetTime() - time);
 }
 
 void ClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {
+	query_manager.begin();
 	boid_model.drawAll(shader, BOID_MESH_NAME, { .cull_backface = false });
+	query_manager.end();
 }
 
 void ClientFlockController::generateOctree() {

@@ -30,7 +30,8 @@ void ImGuiHandler::startFrame(FlockControllerBase* base) {
 	ImGui::NewFrame();
 
 	ImGui::Begin("Boids Simulation Constants");
-	ImGui::Text("Average Update Time: %.3f ms", base->update_avg * 1000.0f);
+	ImGui::Text("Average Update Time: %.3f ms", base->update_timer.update_avg * 1000.0f);
+	ImGui::Text("Average Render Time: %.3f ms", base->render_timer.update_avg * 1000.0f);
 	ImGui::SliderInt("Boid Count", (int*)&base->boid_count, base->MIN_BOIDS, base->MAX_BOIDS);
 	ImGui::SliderFloat("Separation", &base->separation_factor, 0.0f, 1.0f);
 	ImGui::SliderFloat("Alignment", &base->alignment_factor, 0.0f, 1.0f);

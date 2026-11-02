@@ -61,8 +61,16 @@ ComputeFlockController::BoidConstants::BoidConstants(ComputeFlockController* sel
 
 void ComputeFlockController::updateFlock(float dt) {
 	// Get compute time from last frame
-	const double poll_time = query_manager.poll();
-	if (poll_time >= 0.0) addUpdateTime(poll_time / 1.0e9);
+	const auto query_result = query_manager.poll();
+	if (query_result.time_in_ns >= 0.0) {
+		switch (query_result.tag) {
+		case 1:
+			update_timer.addUpdateTime(query_result.time_in_ns / 1.0e9);
+			break;
+		case 2:
+			render_timer.addUpdateTime(query_result.time_in_ns / 1.0e9);
+		}
+	}
 
 	// If boid count has changed, add or remove boids
 	auto& boids_data_buffer = boids_data.getReadBuffer();
@@ -117,7 +125,7 @@ void ComputeFlockController::updateFlock(float dt) {
 	}
 
 	// Start timer
-	query_manager.begin();
+	query_manager.begin(1);
 
 	// Update constants and wait for completion
 	boids_constants.updateBuffer({ BoidConstants(this, dt) });
@@ -151,10 +159,12 @@ void ComputeFlockController::updateFlock(float dt) {
 
 void ComputeFlockController::drawAll(const TAGShaderManager::Shader& shader) {
 	glDisable(GL_CULL_FACE);
+	query_manager.begin(2);
 	PingPongBuffer<TAGModel::ShaderObject>::Buffer& inst_buffer = boids_instance.getWriteBuffer();
 	inst_buffer.bindToVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID(), 0);
 	boid_mesh.draw(shader, {}, boid_count);
 	inst_buffer.unbindFromVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID());
+	query_manager.end();
 	glEnable(GL_CULL_FACE);
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }

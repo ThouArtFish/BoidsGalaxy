@@ -23,7 +23,7 @@ public:
 	std::string mainLoop() override;
 private:
 	static constexpr float AMBIENCE = 0.0f;
-	static constexpr size_t BOID_COUNT = 3000;
+	static constexpr size_t BOID_COUNT = 6400;
 	static constexpr float SPEED = 70.0f;
 	static constexpr size_t PLANET_COUNT = 5;
 
@@ -33,7 +33,7 @@ private:
 	inline static const std::vector<std::string> shader_names = { main_shader, skybox_shader };
 
 	TAM::PlayerController player_controller{};
-	std::unique_ptr<FlockControllerBase> flock_controller = std::make_unique<ClientFlockController>(BOID_COUNT);
+	std::unique_ptr<FlockControllerBase> flock_controller = std::make_unique<ComputeFlockController>(BOID_COUNT);
 	PlanetManager planet_manager{ PLANET_COUNT };
 	TAGSkybox skybox{ "space_skybox.png" };
 	TAGLightManager<TAGLight::Ray> sunlight{ TAGResourceManager::BufferAccess::STATIC, 1 };

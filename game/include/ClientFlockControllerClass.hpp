@@ -25,6 +25,7 @@ private:
 	static constexpr float OCTREE_LOOSE_BOUNDS_FAC = 1.7f;
 	static constexpr size_t OCTREE_MAX_BOIDS = 15;
 	static constexpr size_t OCTREE_MAX_DEPTH = 5;
+
 	TAGModel boid_model = TAGModel({}, TAGResourceManager::BufferAccess::STREAM);
 	std::vector<BoidData> boids_data;
 	std::vector<OctreeNode> octree;
