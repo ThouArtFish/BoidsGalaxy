@@ -22,7 +22,7 @@ public:
 	void iconifyCallback() override {};
 	std::string mainLoop() override;
 private:
-	static constexpr float AMBIENCE = 0.0f;
+	static constexpr float AMBIENCE = 0.4f;
 	static constexpr size_t BOID_COUNT = 6400;
 	static constexpr float SPEED = 70.0f;
 	static constexpr size_t PLANET_COUNT = 5;
