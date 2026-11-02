@@ -30,7 +30,7 @@ struct FlockControllerBase {
 		{ glm::vec3(0.0f, -1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() },
 		{ glm::vec3(0.0f, -1.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec2() }
 	};
-	inline static const std::vector<TAGMesh::Fragment> MESH_INDICES = { { 0, 1, 2 }, { 3, 4, 5 } };
+	inline static const std::vector<TAGMesh::Fragment> MESH_INDICES = { { 0, 2, 1 }, { 3, 4, 5 } };
 	inline static const TAGMesh::Material MESH_MAT = { .colour = glm::vec3(1.0f, 0.0f, 0.0f) };
 	inline static const std::string BOID_MESH_NAME = "boids";
 	inline static const glm::vec3 START_DIR = glm::vec3(0.0f, 1.0f, 0.0f);
