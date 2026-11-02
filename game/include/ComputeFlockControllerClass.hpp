@@ -7,6 +7,7 @@
 #include <UtilClass.hpp>
 #include "PingPongBufferClass.hpp"
 #include "FlockControllerBase.hpp"
+#include "QueryManagerClass.hpp"
 
 class ComputeFlockController : public FlockControllerBase {
 public:
@@ -34,7 +35,7 @@ public:
 private:
 	TAGMesh boid_mesh{ MESH_VERTICES, MESH_INDICES, MESH_MAT };
 	TAGShaderManager shaders{};
-
+	QueryManager query_manager{};
 	PingPongBuffer<TAGModel::ShaderObject> boids_instance;
 	PingPongBuffer<BoidObject> boids_data;
 	TAGResourceManager::UnmappedBuffer<BoidConstants> boids_constants;

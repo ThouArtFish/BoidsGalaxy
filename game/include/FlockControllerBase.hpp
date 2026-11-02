@@ -2,7 +2,8 @@
 
 #include <MeshClass.hpp>
 
-struct FlockControllerBase {
+class FlockControllerBase {
+public:
 	inline static const std::vector<TAGMesh::Vertex> MESH_VERTICES = {
 		{ glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
 		{ glm::vec3(1.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec2() },
@@ -17,6 +18,7 @@ struct FlockControllerBase {
 	inline static const glm::vec3 START_DIR = glm::vec3(0.0f, 1.0f, 0.0f);
 	static constexpr size_t MIN_BOIDS = 10;
 	static constexpr size_t MAX_BOIDS = 10000;
+	static constexpr float UPDATE_FRAMES = 60.0f;
 
 	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.05f;
 	float protected_range = 5.0f, visible_range = 30.0f;
@@ -25,10 +27,15 @@ struct FlockControllerBase {
 	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(350.0f), .min = glm::vec3(-350.0f) };
 	float min_speed = 20.0f, max_speed = 60.0f;
 	float boid_scale = 1.5f;
+	double update_avg = 0.0;
 	size_t boid_count;
 
 	virtual ~FlockControllerBase() = default;
-	FlockControllerBase(size_t boid_count) : boid_count(glm::clamp(boid_count, MIN_BOIDS, MAX_BOIDS)) {}
+	FlockControllerBase(size_t boid_count);
+	void addUpdateTime(double dt);
 	virtual void updateFlock(float dt) = 0;
 	virtual void drawAll(const TAGShaderManager::Shader& shader) = 0;
+private:
+	double update_total = 0.0;
+	double update_count = 0.0;
 };

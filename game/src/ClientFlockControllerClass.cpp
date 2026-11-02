@@ -43,7 +43,7 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 void ClientFlockController::updateFlock(float dt) {
 	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * border_start_factor, .min = game_bounds.min * border_start_factor };
 	std::vector<size_t> movers;
-
+	const double time = glfwGetTime();
 	// If boid count has changed, add or remove boids
 	const size_t change_boids = (size_t)glm::abs((int)boid_count - (int)boids_data.size());
 	if (boid_count > boids_data.size()) {
@@ -213,6 +213,8 @@ void ClientFlockController::updateFlock(float dt) {
 			}
 		}
 	}
+
+	addUpdateTime(glfwGetTime() - time);
 }
 
 void ClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {

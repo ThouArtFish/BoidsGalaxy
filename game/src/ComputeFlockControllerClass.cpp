@@ -60,6 +60,10 @@ ComputeFlockController::BoidConstants::BoidConstants(ComputeFlockController* sel
 }
 
 void ComputeFlockController::updateFlock(float dt) {
+	// Get compute time from last frame
+	const double poll_time = query_manager.poll();
+	if (poll_time >= 0.0) addUpdateTime(poll_time / 1.0e9);
+
 	// If boid count has changed, add or remove boids
 	auto& boids_data_buffer = boids_data.getReadBuffer();
 	auto& boids_instance_buffer = boids_instance.getReadBuffer();
@@ -112,6 +116,9 @@ void ComputeFlockController::updateFlock(float dt) {
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	}
 
+	// Start timer
+	query_manager.begin();
+
 	// Update constants and wait for completion
 	boids_constants.updateBuffer({ BoidConstants(this, dt) });
 	glMemoryBarrier(GL_UNIFORM_BARRIER_BIT);
@@ -130,6 +137,9 @@ void ComputeFlockController::updateFlock(float dt) {
 	boids_instance.unbindReadWrite();
 	boids_data.unbindReadWrite();
 	boids_constants.unbindFromShader(4, TAGResourceManager::ShaderBufferType::UNIFORM);
+
+	// End time
+	query_manager.end();
 
 	// Swap read and write buffers
 	boids_instance.switchBuffers();
