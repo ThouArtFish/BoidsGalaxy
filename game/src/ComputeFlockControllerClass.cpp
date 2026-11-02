@@ -138,7 +138,7 @@ void ComputeFlockController::updateFlock(float dt) {
 
 	// Dispatch compute
 	shaders.useShader(COMPUTE_BOID_UPDATE_NAME);
-	glDispatchCompute(glm::ceil((GLfloat)boid_count / 64.0f), 1, 1);
+	glDispatchCompute(glm::ceil((GLfloat)boid_count / WORK_GROUP_SIZE), 1, 1);
 	shaders.stopShader();
 
 	// Unbind buffer

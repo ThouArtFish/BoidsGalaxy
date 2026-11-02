@@ -1,6 +1,8 @@
 #version 460 core
 
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+#define WORK_GROUP_SIZE 128u
+
+layout(local_size_x = WORK_GROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 struct Constants {
   float separation_factor, alignment_factor, cohesion_factor;
@@ -70,7 +72,7 @@ void main() {
   float visible_boids = 0.0f;
   vec3 repel_sum = vec3(0.0), vel_sum = vec3(0.0), pos_sum = vec3(0.0);
 
-  for (uint base = 0; base < total_boids; base += 64u) {
+  for (uint base = 0; base < total_boids; base += WORK_GROUP_SIZE) {
     const uint j = base + li;
     if (j < total_boids)
       tile[li] = createBoid(read_inst_boids[j], read_data_boids[j]);
@@ -79,7 +81,7 @@ void main() {
     barrier();
 
     if (valid) {
-      const uint count = min(64u, total_boids - base);
+      const uint count = min(WORK_GROUP_SIZE, total_boids - base);
 
       for (uint k = 0; k < count; k++) {
         if (k + base == i)
