@@ -36,18 +36,26 @@ PlanetManager::PlanetManager(size_t num_planets, const glm::vec3& arm, const glm
 	planet_model.addMesh(PLANET_MESH_NAME, vertices, frags, { .colour = glm::vec3(0.0f, 1.0f, 0.0f) });
 }
 
-void PlanetManager::generatePlanets() {
+void PlanetManager::generatePlanets(const TAGMesh::BoundingBox& bounds) {
 	std::vector<TAGModel::Object> planets(num_planets);
 	for (TAGModel::Object& planet : planets) {
 		planet.position = {
-			TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
-			TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
-			TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
+			TAGUtil::randomRangeFloat(bounds.min.x, bounds.max.x),
+			TAGUtil::randomRangeFloat(bounds.min.y, bounds.max.y),
+			TAGUtil::randomRangeFloat(bounds.min.z, bounds.max.z)
 		};
 		planet.scale = TAGUtil::randomRangeFloat(min_radius, max_radius);
 	}
 	planet_model.setAllInstances(planets, PLANET_MESH_NAME);
 	planet_model.updateInstanceBuffer(PLANET_MESH_NAME);
+}
+
+std::vector<PlanetManager::PlanetData> PlanetManager::getPlanetData() const {
+	std::vector<PlanetData> planet_data;
+	for (const auto& planet : planet_model.getAllInstances(PLANET_MESH_NAME)) {
+		planet_data.push_back({ .position = planet.position, .orbit_radius = planet.scale * orbit_radius_factor });
+	}
+	return planet_data;
 }
 
 void PlanetManager::drawAll(const TAGShaderManager::Shader& shader) {

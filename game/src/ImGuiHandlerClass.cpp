@@ -38,8 +38,8 @@ void ImGuiHandler::startFrame(FlockControllerBase* base) {
 	ImGui::SliderFloat("Cohesion", &base->cohesion_factor, 0.0f, 0.5f);
 	ImGui::SliderFloat("Visible Range", &base->visible_range, 0.0f, 200.0f);
 	ImGui::SliderFloat("Collision Range", &base->protected_range, 0.0f, 200.0f);
-	ImGui::InputFloat3("Minimum Space Bounds", &base->game_bounds.min[0]);
-	ImGui::InputFloat3("Maximum Space Bounds", &base->game_bounds.max[0]);
+	ImGui::SliderFloat3("Minimum Space Bounds", &base->game_bounds.min[0], -1000.0f, 0.0f);
+	ImGui::SliderFloat3("Maximum Space Bounds", &base->game_bounds.max[0], 0.0f, 1000.0f);
 	ImGui::SliderFloat("Minimum Speed", &base->min_speed, 0.0f, 100.0f);
 	ImGui::SliderFloat("Maximum Speed", &base->max_speed, 0.0f, 100.0f);
 

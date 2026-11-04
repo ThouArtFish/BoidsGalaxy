@@ -11,13 +11,15 @@ MainState::MainState() {
 		{ skybox_shader, "", TAGShaderManager::DefaultProgramType::SKYBOX_DRAW }
 	});
 
-	planet_manager.generatePlanets();
+	planet_manager.generatePlanets(flock_controller->game_bounds);
 
 	sunlight.setLight({ .direction = { 1.0f, 0.0f, 0.0f }, .colour = { 1.0f, 1.0f, 1.0f } });
 	sunlight.updateLightBuffer();
 
 	shaders.useShader(main_shader).set(TAGShaderManager::default_options.ambience, AMBIENCE);
 	setProjectiveMatrix();
+
+	flock_controller->updatePlanets(planet_manager);
 }
 
 void MainState::mouseCallback() {

@@ -3,7 +3,9 @@
 ComputeFlockController::ComputeFlockController(size_t boid_count) : FlockControllerBase(boid_count),
 	boids_instance(boid_count, TAGResourceManager::BufferAccess::STREAM),
 	boids_data(boid_count, TAGResourceManager::BufferAccess::STREAM),
-	boids_constants(1, 1, TAGResourceManager::BufferAccess::STREAM)
+	boids_constants(1, 1, TAGResourceManager::BufferAccess::STATIC),
+	planets(1, 1, TAGResourceManager::BufferAccess::STATIC),
+	planets_constants(1, 1, TAGResourceManager::BufferAccess::STATIC)
 {
 	// Compile shaders
 	shaders.addShader<ProgramType::Compute>(ProgramType::Compute{ COMPUTE_BOID_UPDATE_NAME, "BoidUpdateCompute.glsl" });
@@ -45,7 +47,7 @@ ComputeFlockController::ComputeFlockController(size_t boid_count) : FlockControl
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
-ComputeFlockController::BoidConstants::BoidConstants(ComputeFlockController* self, float dt) {
+ComputeFlockController::BoidConstants::BoidConstants(const ComputeFlockController* self, float dt) {
 	separation_factor = self->separation_factor;
 	alignment_factor = self->alignment_factor;
 	cohesion_factor = self->cohesion_factor;
@@ -57,6 +59,13 @@ ComputeFlockController::BoidConstants::BoidConstants(ComputeFlockController* sel
 	max_margin = self->game_bounds.max * self->border_start_factor;
 	total_boids = self->boid_count;
 	this->dt = dt;
+}
+
+ComputeFlockController::PlanetConstants::PlanetConstants(const PlanetManager* planets) {
+	orbit_pull = planets->orbit_pull;
+	orbit_pull_range = planets->orbit_pull_range;
+	tangent_boost = planets->tangent_boost;
+	total_planets = planets->num_planets;
 }
 
 void ComputeFlockController::updateFlock(float dt) {
@@ -135,6 +144,8 @@ void ComputeFlockController::updateFlock(float dt) {
 	boids_instance.bindReadWrite(0, 1);
 	boids_data.bindReadWrite(2, 3);
 	boids_constants.bindToShader(4, TAGResourceManager::ShaderBufferType::UNIFORM, 0);
+	planets.bindToShader(5, TAGResourceManager::ShaderBufferType::SHADER_STORAGE, 0);
+	planets_constants.bindToShader(6, TAGResourceManager::ShaderBufferType::UNIFORM, 0);
 
 	// Dispatch compute
 	shaders.useShader(COMPUTE_BOID_UPDATE_NAME);
@@ -145,6 +156,8 @@ void ComputeFlockController::updateFlock(float dt) {
 	boids_instance.unbindReadWrite();
 	boids_data.unbindReadWrite();
 	boids_constants.unbindFromShader(4, TAGResourceManager::ShaderBufferType::UNIFORM);
+	planets.unbindFromShader(5, TAGResourceManager::ShaderBufferType::SHADER_STORAGE);
+	planets_constants.unbindFromShader(6, TAGResourceManager::ShaderBufferType::UNIFORM);
 
 	// End time
 	query_manager.end();
@@ -155,6 +168,15 @@ void ComputeFlockController::updateFlock(float dt) {
 
 	// First since buffer is attached to VAO for instance data, second since ranges will be written to on later frames
 	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+}
+
+void ComputeFlockController::updatePlanets(const PlanetManager& planet_manager) {
+	const auto& planet_data = planet_manager.getPlanetData();
+
+	if (planet_data.size() > planets.getMaxObjects()) planets.resizeBuffer(planet_data.size());
+
+	planets.updateBuffer(planet_data);
+	planets_constants.updateBuffer({ PlanetConstants(&planet_manager) });
 }
 
 void ComputeFlockController::drawAll(const TAGShaderManager::Shader& shader) {

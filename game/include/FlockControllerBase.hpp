@@ -1,6 +1,7 @@
 #pragma once
 
 #include <MeshClass.hpp>
+#include "PlanetManagerClass.hpp"
 #include "QueryManagerClass.hpp"
 
 class Timer {
@@ -39,10 +40,10 @@ struct FlockControllerBase {
 	static constexpr float UPDATE_FRAMES = 60.0f;
 
 	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.05f;
-	float protected_range = 5.0f, visible_range = 30.0f;
+	float protected_range = 9.0f, visible_range = 40.0f;
 	float border_factor = 0.2f;
 	float border_start_factor = 0.87f;
-	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(350.0f), .min = glm::vec3(-350.0f) };
+	TAGMesh::BoundingBox game_bounds = { .max = glm::vec3(400.0f), .min = glm::vec3(-400.0f) };
 	float min_speed = 20.0f, max_speed = 60.0f;
 	float boid_scale = 1.5f;
 	Timer update_timer{}, render_timer{};
@@ -52,5 +53,6 @@ struct FlockControllerBase {
 	virtual ~FlockControllerBase() = default;
 	FlockControllerBase(size_t boid_count) : boid_count(glm::clamp(boid_count, MIN_BOIDS, MAX_BOIDS)) {};
 	virtual void updateFlock(float dt) = 0;
+	virtual void updatePlanets(const PlanetManager& planet_manager) = 0;
 	virtual void drawAll(const TAGShaderManager::Shader& shader) = 0;
 };

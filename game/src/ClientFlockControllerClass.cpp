@@ -6,9 +6,9 @@ ClientFlockController::ClientFlockController(size_t boid_count) : FlockControlle
 	const float start_speed = (max_speed - min_speed) / 2.0f;
 	for (size_t i = 0; i < boid_count; i++) {
 		const glm::vec3 spawn_pos = {
-		TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
-		TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
-		TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
+			TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
+			TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
+			TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
 		};
 		glm::vec3 dir = {
 			TAGUtil::randomRangeFloat(-1.0f, 1.0f),
@@ -41,12 +41,14 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 
 
 void ClientFlockController::updateFlock(float dt) {
+	// Check queries for the last render time
 	const auto query_result = query_manager.poll();
 	if (query_result.time_in_ns >= 0) render_timer.addUpdateTime(query_result.time_in_ns / 1.0e9);
 
+	const double time = glfwGetTime();
 	const TAGMesh::BoundingBox margins = { .max = game_bounds.max * border_start_factor, .min = game_bounds.min * border_start_factor };
 	std::vector<size_t> movers;
-	const double time = glfwGetTime();
+
 	// If boid count has changed, add or remove boids
 	const size_t change_boids = (size_t)glm::abs((int)boid_count - (int)boids_data.size());
 	if (boid_count > boids_data.size()) {
@@ -93,9 +95,11 @@ void ClientFlockController::updateFlock(float dt) {
 		const auto& boid = boids[i];
 		const auto& boid_data = boids_data[i];
 
-		glm::vec3 move_away{}, vel_avg{}, pos_avg{};
+		glm::vec3 orbit{}, move_away{}, vel_avg{}, pos_avg{};
 		int visible_boids = 0;
 
+
+		// Update against each boid in leaf node
 		for (size_t j : octree[boid_data.leaf].boid_indices) {
 			if (i == j) continue;
 
@@ -113,18 +117,48 @@ void ClientFlockController::updateFlock(float dt) {
 			};
 		}
 
+		// Update against each planet in leaf node
+		for (size_t planet_index : octree[boid_data.leaf].planet_indices) {
+			auto& planet = planet_data[planet_index];
+
+			glm::vec3 normal = boid.position - planet.position;
+			const float normal_length = glm::length(normal);
+
+			if (normal_length > planet.orbit_radius + PlanetManager::orbit_pull_range) continue;
+
+			normal /= normal_length;
+
+			glm::vec3 tangent = TAGUtil::perpendicularCompNorm(normal, boid_data.direction);
+			if (glm::dot(tangent, tangent) < 1e-5f) {
+				tangent = glm::vec3(0.0f, 1.0f, 0.0f) * (boid_data.direction.y <= 0.0f ? 1.0f : -1.0f);
+			}
+			else {
+				tangent = glm::normalize(tangent);
+			}
+
+			const glm::vec3 desired = tangent * boid_data.speed * PlanetManager::tangent_boost + normal * PlanetManager::orbit_pull * (planet.orbit_radius - normal_length);
+			
+			orbit += desired - boid_data.direction * boid_data.speed;
+		}
+
+		// Calculate new boid data
 		BoidData new_boid_data = boid_data;
 		glm::vec3 boid_vel = boid_data.direction * boid_data.speed;
+		// Alignment and Cohesion
 		if (visible_boids > 0) {
 			boid_vel += (
 				((vel_avg / (float)visible_boids) - boid_vel) * alignment_factor + 
 				((pos_avg / (float)visible_boids) - boid.position) * cohesion_factor
 			) * dt;
 		}
+		// Separation
 		if (move_away != glm::vec3(0.0f)) {
 			boid_vel += move_away * separation_factor * dt;
 		}
+		// Avoid game border
 		boid_vel += (glm::clamp(boid.position, margins.min, margins.max) - boid.position) * border_factor * dt;
+		// Orbit planets
+		boid_vel += orbit * dt;
 
 		const float length = glm::length(boid_vel);
 		new_boid_data.speed = glm::clamp(length, min_speed, max_speed);
@@ -164,25 +198,32 @@ void ClientFlockController::updateFlock(float dt) {
 		if (old_leaf_index > 0) {
 			OctreeNode& parent_node = octree[old_leaf.parent_index];
 			bool children_all_leaf = true;
+			size_t sum_children_boids = 0;
 			for (size_t i = 0; i < 8; i++) {
-				OctreeNode& child_node = octree[parent_node.first_child_index + i];
+				const OctreeNode& child_node = octree[parent_node.first_child_index + i];
 
 				if (!child_node.isLeaf()) {
 					children_all_leaf = false;
 					break;
 				}
 
-				parent_node.boid_indices.insert(parent_node.boid_indices.end(), child_node.boid_indices.begin(), child_node.boid_indices.end());
+				sum_children_boids += child_node.boid_indices.size();
 			}
 
-			if (children_all_leaf && parent_node.boid_indices.size() <= OCTREE_MAX_BOIDS / 2) {
+			if (children_all_leaf && sum_children_boids <= OCTREE_MAX_BOIDS / 2) {
+				for (size_t i = 0; i < 8; i++) {
+					const OctreeNode& child_node = octree[parent_node.first_child_index + i];
+
+					parent_node.boid_indices.insert(parent_node.boid_indices.end(), child_node.boid_indices.begin(), child_node.boid_indices.end());
+					for (size_t planet_index : child_node.planet_indices) {
+						if (std::find(parent_node.planet_indices.begin(), parent_node.planet_indices.end(), planet_index) == parent_node.planet_indices.end()) parent_node.planet_indices.push_back(planet_index);
+					}
+				}
+
 				free_intervals.push_back(parent_node.first_child_index);
 				parent_node.first_child_index = 0;
 
 				for (size_t boid_index : parent_node.boid_indices) boids_data[boid_index].leaf = old_leaf.parent_index;
-			}
-			else {
-				parent_node.boid_indices.clear();
 			}
 		}
 
@@ -192,7 +233,7 @@ void ClientFlockController::updateFlock(float dt) {
 			const size_t node_index = split_cascade_stack.back();
 			split_cascade_stack.pop_back();
 
-			if (octree[node_index].boid_indices.size() > OCTREE_MAX_BOIDS && octree[node_index].depth <= OCTREE_MAX_DEPTH) {
+			if (octree[node_index].boid_indices.size() > OCTREE_MAX_BOIDS && octree[node_index].depth < OCTREE_MAX_DEPTH) {
 				auto child_bounds = splitNode(octree[node_index].bounds);
 				if (!free_intervals.empty()) {
 					octree[node_index].first_child_index = free_intervals.back();
@@ -212,12 +253,33 @@ void ClientFlockController::updateFlock(float dt) {
 
 					boids_data[boid_index].leaf = leaf_index;
 				}
+
+				for (size_t planet_index : octree[node_index].planet_indices) {
+					const std::vector<size_t> leaf_indices = getPlanetLeaf(planet_data[planet_index].position, planet_data[planet_index].orbit_radius, node_index);
+					const size_t fsi = octree[node_index].first_child_index;
+					for (size_t planet_leaf_index : leaf_indices)
+						if (planet_leaf_index >= fsi && planet_leaf_index < fsi + 8) octree[planet_leaf_index].planet_indices.push_back(planet_index);
+				}
+
 				octree[node_index].boid_indices.clear();
+				octree[node_index].planet_indices.clear();
 			}
 		}
 	}
 
 	update_timer.addUpdateTime(glfwGetTime() - time);
+}
+
+void ClientFlockController::updatePlanets(const PlanetManager& planets_manager) {
+	this->planet_data = planets_manager.getPlanetData();
+
+	for (auto& node : octree) node.planet_indices.clear();
+
+	for (size_t i = 0; i < planet_data.size(); i++) {
+		const std::vector<size_t> leaves = getPlanetLeaf(planet_data[i].position, planet_data[i].orbit_radius, 0);
+
+		for (size_t leaf : leaves) octree[leaf].planet_indices.push_back(i);
+	}
 }
 
 void ClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {
@@ -297,6 +359,25 @@ size_t ClientFlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) cons
 			+ (pos.z >= c.z ? 4 : 0);
 	}
 	return idx;
+}
+
+std::vector<size_t> ClientFlockController::getPlanetLeaf(glm::vec3 pos, float radius, size_t start_node) const {
+	std::vector<size_t> stack{ start_node }, leaves;
+	while (!stack.empty()) {
+		const size_t node_index = stack.back();
+		stack.pop_back();
+		const glm::vec3 bounded_dist = glm::clamp(pos, octree[node_index].loose_bounds.min, octree[node_index].loose_bounds.max) - pos;
+		const float dist_sqr = glm::dot(bounded_dist, bounded_dist);
+		if (dist_sqr <= radius * radius) {
+			if (octree[node_index].isLeaf()) {
+				leaves.push_back(node_index);
+			}
+			else {
+				for (size_t i = 0; i < 8; i++) stack.push_back(octree[node_index].first_child_index + i);
+			}
+		}
+	}
+	return leaves;
 }
 
 TAGModel::Object ClientFlockController::pointDirection(const glm::vec3& new_direction) {
