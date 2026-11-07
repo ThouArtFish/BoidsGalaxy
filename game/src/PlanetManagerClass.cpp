@@ -33,7 +33,7 @@ PlanetManager::PlanetManager(size_t num_planets, const glm::vec3& arm, const glm
 		frags[index++] = { ((i - 1) / gv == layer + 1 ? i - gv + 1 : i + 1), i, ((i + gv - 1) / gv != layer + 1 ? i + 1 : i + gv + 1) };
 	}
 
-	planet_model.addMesh(PLANET_MESH_NAME, vertices, frags, { .colour = glm::vec3(0.0f, 1.0f, 0.0f) });
+	planet_model.addMesh(PLANET_MESH_NAME, vertices, frags, PLANET_MAT);
 }
 
 void PlanetManager::generatePlanets(const TAGMesh::BoundingBox& bounds) {
