@@ -1,4 +1,4 @@
-#include "../include/QueryManagerClass.hpp"
+#include <util/QueryManagerClass.hpp>
 
 QueryManager::QueryManager() {
 	init();

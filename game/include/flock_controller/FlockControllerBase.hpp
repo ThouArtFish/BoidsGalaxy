@@ -1,8 +1,8 @@
 #pragma once
 
 #include <MeshClass.hpp>
-#include "PlanetManagerClass.hpp"
-#include "QueryManagerClass.hpp"
+#include <util/PlanetManagerClass.hpp>
+#include <util/QueryManagerClass.hpp>
 
 class Timer {
 public:
@@ -35,8 +35,8 @@ struct FlockControllerBase {
 	inline static const TAGMesh::Material MESH_MAT = { .colour = glm::vec3(1.0f, 0.0f, 0.0f) };
 	inline static const std::string BOID_MESH_NAME = "boids";
 	inline static const glm::vec3 START_DIR = glm::vec3(0.0f, 1.0f, 0.0f);
-	static constexpr size_t MIN_BOIDS = 10;
-	static constexpr size_t MAX_BOIDS = 30000;
+	static constexpr size_t MIN_BOIDS = 1000;
+	static constexpr size_t MAX_BOIDS = 60000;
 	static constexpr float UPDATE_FRAMES = 60.0f;
 
 	float separation_factor = 0.5f, alignment_factor = 0.5f, cohesion_factor = 0.05f;

@@ -6,14 +6,16 @@
 #include <ModelClass.hpp>
 #include <SkyboxClass.hpp>
 #include <UtilClass.hpp>
-#include "TAMPlayerController.hpp"
-#include "ClientFlockControllerClass.hpp"
-#include "ComputeFlockControllerClass.hpp"
-#include "PlanetManagerClass.hpp"
-#include "ImGuiHandlerClass.hpp"
+#include <util/TAMPlayerController.hpp>
+#include <util/PlanetManagerClass.hpp>
+#include <util/ImGuiHandlerClass.hpp>
+#include <flock_controller/OctreeClientFlockControllerClass.hpp>
+#include <flock_controller/NaiveComputeFlockControllerClass.hpp>
 
 class MainState : public TAGBaseState {
 public:
+	using FlockController = OctreeClientFlockController; // Change the flock controller
+
 	MainState();
 	void enter() override {};
 	void exit() override {};
@@ -33,7 +35,7 @@ private:
 	inline static const std::vector<std::string> shader_names = { main_shader, skybox_shader };
 
 	TAM::PlayerController player_controller{};
-	std::unique_ptr<FlockControllerBase> flock_controller = std::make_unique<ComputeFlockController>(BOID_COUNT);
+	std::unique_ptr<FlockControllerBase> flock_controller = std::make_unique<FlockController>(BOID_COUNT);
 	PlanetManager planet_manager{ PLANET_COUNT };
 	TAGSkybox skybox{ "space_skybox.png" };
 	TAGLightManager<TAGLight::Ray> sunlight{ TAGResourceManager::BufferAccess::STATIC, 1 };

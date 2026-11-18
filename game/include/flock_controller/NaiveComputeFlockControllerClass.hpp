@@ -5,11 +5,12 @@
 #include <ModelClass.hpp>
 #include <MeshClass.hpp>
 #include <UtilClass.hpp>
-#include "PingPongBufferClass.hpp"
-#include "FlockControllerBase.hpp"
-#include "QueryManagerClass.hpp"
+#include <util/PingPongBufferClass.hpp>
+#include <util/QueryManagerClass.hpp>
+#include <util/PlanetManagerClass.hpp>
+#include <flock_controller/FlockControllerBase.hpp>
 
-class ComputeFlockController : public FlockControllerBase {
+class NaiveComputeFlockController : public FlockControllerBase {
 public:
 	struct BoidConstants {
 		GLfloat separation_factor, alignment_factor, cohesion_factor;
@@ -20,7 +21,7 @@ public:
 		GLuint total_boids;
 		GLfloat dt;
 
-		BoidConstants(const ComputeFlockController* self, float dt);
+		BoidConstants(const NaiveComputeFlockController* self, float dt);
 	};
 	struct PlanetConstants {
 		GLfloat orbit_pull, orbit_pull_range, tangent_boost;
@@ -35,11 +36,12 @@ public:
 	inline static const std::string COMPUTE_BOID_UPDATE_NAME = "computer_boid_update";
 	constexpr static float WORK_GROUP_SIZE = 128.0f;
 
-	ComputeFlockController(size_t boid_count);
+	NaiveComputeFlockController(size_t boid_count, bool override = false);
 	void updateFlock(float dt) override;
 	void updatePlanets(const PlanetManager& planet_manager) override;
 	void drawAll(const TAGShaderManager::Shader& shader) override;
-private:
+	void compileComputeShader(const std::string& path);
+protected:
 	TAGMesh boid_mesh{ MESH_VERTICES, MESH_INDICES, MESH_MAT };
 	TAGShaderManager shaders{};
 	PingPongBuffer<TAGModel::ShaderObject> boids_instance;

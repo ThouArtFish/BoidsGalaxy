@@ -62,7 +62,7 @@ layout(std140, binding = 6) uniform planet_constants {
   PlanetConstants p_constants;
 };
 
-shared Boid tile[64];
+shared Boid tile[WORK_GROUP_SIZE];
 
 vec4 pointDirection(vec3 new_dir) {
   const vec3 axis = cross(vec3(0.0, 1.0, 0.0), new_dir);

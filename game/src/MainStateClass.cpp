@@ -1,7 +1,6 @@
-#include "../include/MainStateClass.hpp"
+#include <states/MainStateClass.hpp>
 
 MainState::MainState() {
-	TAGBaseState::far = 1000.0f;
 	frame_interval = 0.0f;
 
 	imgui_handler.createContext(TAGBaseState::window);

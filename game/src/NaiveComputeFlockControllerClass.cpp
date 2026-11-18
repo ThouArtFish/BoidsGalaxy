@@ -1,14 +1,16 @@
-#include "../include/ComputeFlockControllerClass.hpp"
+#include <flock_controller/NaiveComputeFlockControllerClass.hpp>
 
-ComputeFlockController::ComputeFlockController(size_t boid_count) : FlockControllerBase(boid_count),
+NaiveComputeFlockController::NaiveComputeFlockController(size_t boid_count, bool override) : FlockControllerBase(boid_count),
 	boids_instance(boid_count, TAGResourceManager::BufferAccess::STREAM),
 	boids_data(boid_count, TAGResourceManager::BufferAccess::STREAM),
-	boids_constants(1, 1, TAGResourceManager::BufferAccess::STATIC),
+	boids_constants(1, 1, TAGResourceManager::BufferAccess::STREAM),
 	planets(1, 1, TAGResourceManager::BufferAccess::STATIC),
 	planets_constants(1, 1, TAGResourceManager::BufferAccess::STATIC)
 {
-	// Compile shaders
-	shaders.addShader<ProgramType::Compute>(ProgramType::Compute{ COMPUTE_BOID_UPDATE_NAME, "BoidUpdateCompute.glsl" });
+	if (override) return;
+
+	// Compile compute shader
+	shaders.addShader<ProgramType::Compute>({ COMPUTE_BOID_UPDATE_NAME, "NaiveBoidUpdateCompute.glsl" });
 
 	// Instantiate boid data
 	const float start_speed = (min_speed + max_speed) / 2.0f;
@@ -47,7 +49,7 @@ ComputeFlockController::ComputeFlockController(size_t boid_count) : FlockControl
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
-ComputeFlockController::BoidConstants::BoidConstants(const ComputeFlockController* self, float dt) {
+NaiveComputeFlockController::BoidConstants::BoidConstants(const NaiveComputeFlockController* self, float dt) {
 	separation_factor = self->separation_factor;
 	alignment_factor = self->alignment_factor;
 	cohesion_factor = self->cohesion_factor;
@@ -61,14 +63,14 @@ ComputeFlockController::BoidConstants::BoidConstants(const ComputeFlockControlle
 	this->dt = dt;
 }
 
-ComputeFlockController::PlanetConstants::PlanetConstants(const PlanetManager* planets) {
+NaiveComputeFlockController::PlanetConstants::PlanetConstants(const PlanetManager* planets) {
 	orbit_pull = planets->orbit_pull;
 	orbit_pull_range = planets->orbit_pull_range;
 	tangent_boost = planets->tangent_boost;
 	total_planets = planets->num_planets;
 }
 
-void ComputeFlockController::updateFlock(float dt) {
+void NaiveComputeFlockController::updateFlock(float dt) {
 	// Get compute time from last frame
 	const auto query_result = query_manager.poll();
 	if (query_result.time_in_ns >= 0.0) {
@@ -91,9 +93,9 @@ void ComputeFlockController::updateFlock(float dt) {
 		const float start_speed = (max_speed - min_speed) / 2.0f;
 		for (size_t i = 0; i < change_boids; i++) {
 			const glm::vec3 spawn_pos = {
-			TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
-			TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
-			TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
+				TAGUtil::randomRangeFloat(game_bounds.min.x, game_bounds.max.x),
+				TAGUtil::randomRangeFloat(game_bounds.min.y, game_bounds.max.y),
+				TAGUtil::randomRangeFloat(game_bounds.min.z, game_bounds.max.z)
 			};
 
 			glm::vec3 dir = {
@@ -150,6 +152,10 @@ void ComputeFlockController::updateFlock(float dt) {
 	// Dispatch compute
 	shaders.useShader(COMPUTE_BOID_UPDATE_NAME);
 	glDispatchCompute(glm::ceil((GLfloat)boid_count / WORK_GROUP_SIZE), 1, 1);
+
+	// First since buffer is attached to VAO for instance data, second since ranges will be written to on later frames
+	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
 	shaders.stopShader();
 
 	// Unbind buffer
@@ -165,12 +171,9 @@ void ComputeFlockController::updateFlock(float dt) {
 	// Swap read and write buffers
 	boids_instance.switchBuffers();
 	boids_data.switchBuffers();
-
-	// First since buffer is attached to VAO for instance data, second since ranges will be written to on later frames
-	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
-void ComputeFlockController::updatePlanets(const PlanetManager& planet_manager) {
+void NaiveComputeFlockController::updatePlanets(const PlanetManager& planet_manager) {
 	const auto& planet_data = planet_manager.getPlanetData();
 
 	if (planet_data.size() > planets.getMaxObjects()) planets.resizeBuffer(planet_data.size());
@@ -179,14 +182,14 @@ void ComputeFlockController::updatePlanets(const PlanetManager& planet_manager) 
 	planets_constants.updateBuffer({ PlanetConstants(&planet_manager) });
 }
 
-void ComputeFlockController::drawAll(const TAGShaderManager::Shader& shader) {
+void NaiveComputeFlockController::drawAll(const TAGShaderManager::Shader& shader) {
 	glDisable(GL_CULL_FACE);
 	query_manager.begin(2);
-	PingPongBuffer<TAGModel::ShaderObject>::Buffer& inst_buffer = boids_instance.getWriteBuffer();
+	auto& inst_buffer = boids_instance.getWriteBuffer();
 	inst_buffer.bindToVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID(), 0);
 	boid_mesh.draw(shader, {}, boid_count);
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	inst_buffer.unbindFromVertexArrayObject(TAGMesh::default_vao_instance_binding_point, TAGMesh::getVertexArrayObjectID());
 	query_manager.end();
 	glEnable(GL_CULL_FACE);
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }

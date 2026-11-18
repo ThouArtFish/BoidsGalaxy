@@ -1,6 +1,6 @@
-#include "../include/ClientFlockControllerClass.hpp"
+#include <flock_controller/OctreeClientFlockControllerClass.hpp>
 
-ClientFlockController::ClientFlockController(size_t boid_count) : FlockControllerBase(boid_count) {
+OctreeClientFlockController::OctreeClientFlockController(size_t boid_count) : FlockControllerBase(boid_count) {
 	boid_model.addMesh(BOID_MESH_NAME, MESH_VERTICES, MESH_INDICES, MESH_MAT);
 	boids_data.reserve(boid_count);
 	const float start_speed = (max_speed - min_speed) / 2.0f;
@@ -27,7 +27,7 @@ ClientFlockController::ClientFlockController(size_t boid_count) : FlockControlle
 	generateOctree();
 }
 
-ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds) :
+OctreeClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth, const TAGMesh::BoundingBox& bounds) :
 	parent_index(parent_index), depth(depth), bounds(bounds)
 {
 	const glm::vec3 c = (bounds.min + bounds.max) / 2.0f;
@@ -40,7 +40,7 @@ ClientFlockController::OctreeNode::OctreeNode(size_t parent_index, size_t depth,
 }
 
 
-void ClientFlockController::updateFlock(float dt) {
+void OctreeClientFlockController::updateFlock(float dt) {
 	// Check queries for the last render time
 	const auto query_result = query_manager.poll();
 	if (query_result.time_in_ns >= 0) render_timer.addUpdateTime(query_result.time_in_ns / 1.0e9);
@@ -270,7 +270,7 @@ void ClientFlockController::updateFlock(float dt) {
 	update_timer.addUpdateTime(glfwGetTime() - time);
 }
 
-void ClientFlockController::updatePlanets(const PlanetManager& planets_manager) {
+void OctreeClientFlockController::updatePlanets(const PlanetManager& planets_manager) {
 	this->planet_data = planets_manager.getPlanetData();
 
 	for (auto& node : octree) node.planet_indices.clear();
@@ -282,13 +282,13 @@ void ClientFlockController::updatePlanets(const PlanetManager& planets_manager) 
 	}
 }
 
-void ClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {
+void OctreeClientFlockController::drawAll(const TAGShaderManager::Shader& shader) {
 	query_manager.begin();
 	boid_model.drawAll(shader, BOID_MESH_NAME, { .cull_backface = false });
 	query_manager.end();
 }
 
-void ClientFlockController::generateOctree() {
+void OctreeClientFlockController::generateOctree() {
 	octree.clear();
 	octree.emplace_back(0, 0, game_bounds);
 
@@ -346,7 +346,7 @@ void ClientFlockController::generateOctree() {
 	}
 }
 
-size_t ClientFlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
+size_t OctreeClientFlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) const {
 	pos = glm::clamp(pos, game_bounds.min, game_bounds.max);
 
 	size_t idx = start_node;
@@ -361,7 +361,7 @@ size_t ClientFlockController::getBoidLeaf(glm::vec3 pos, size_t start_node) cons
 	return idx;
 }
 
-std::vector<size_t> ClientFlockController::getPlanetLeaf(glm::vec3 pos, float radius, size_t start_node) const {
+std::vector<size_t> OctreeClientFlockController::getPlanetLeaf(glm::vec3 pos, float radius, size_t start_node) const {
 	std::vector<size_t> stack{ start_node }, leaves;
 	while (!stack.empty()) {
 		const size_t node_index = stack.back();
@@ -380,7 +380,7 @@ std::vector<size_t> ClientFlockController::getPlanetLeaf(glm::vec3 pos, float ra
 	return leaves;
 }
 
-TAGModel::Object ClientFlockController::pointDirection(const glm::vec3& new_direction) {
+TAGModel::Object OctreeClientFlockController::pointDirection(const glm::vec3& new_direction) {
 	const glm::vec3 cross = glm::cross(START_DIR, new_direction);
 	const float cross_length = glm::length(cross);
 	return {
@@ -389,7 +389,7 @@ TAGModel::Object ClientFlockController::pointDirection(const glm::vec3& new_dire
 	};
 }
 
-std::array<TAGMesh::BoundingBox, 8> ClientFlockController::splitNode(const TAGMesh::BoundingBox& node) {
+std::array<TAGMesh::BoundingBox, 8> OctreeClientFlockController::splitNode(const TAGMesh::BoundingBox& node) {
 	const glm::vec3 c = (node.max + node.min) / 2.0f;
 	std::array<TAGMesh::BoundingBox, 8> child_nodes{};
 	for (size_t i = 0; i < 8; i++) {

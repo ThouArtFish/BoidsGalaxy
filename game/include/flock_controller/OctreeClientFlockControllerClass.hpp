@@ -1,12 +1,12 @@
 #pragma once
 
 #include <ModelClass.hpp>
-#include "PlanetManagerClass.hpp"
-#include "FlockControllerBase.hpp"
+#include <util/PlanetManagerClass.hpp>
+#include <flock_controller/FlockControllerBase.hpp>
 
-class ClientFlockController :  public FlockControllerBase {
+class OctreeClientFlockController :  public FlockControllerBase {
 public:
-	ClientFlockController(size_t boid_count);
+	OctreeClientFlockController(size_t boid_count);
 	void updateFlock(float dt) override;
 	void updatePlanets(const PlanetManager& planets_manager) override;
 	void drawAll(const TAGShaderManager::Shader& shader) override;

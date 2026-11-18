@@ -1,4 +1,4 @@
-#include "../include/PlanetManagerClass.hpp"
+#include <util/PlanetManagerClass.hpp>
 
 PlanetManager::PlanetManager(size_t num_planets, const glm::vec3& arm, const glm::vec3& axis) : num_planets(num_planets) {
 	const size_t v = glm::max((size_t)4, planet_vertical_strips), h = glm::max((size_t)4, planet_horizontal_strips);

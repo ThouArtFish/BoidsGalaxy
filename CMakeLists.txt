@@ -11,9 +11,6 @@ project(${PROJECT_NAME})
 # Path to source files
 set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/game/src/)
 
-# Change where the .exe is located - asset path depends on where this is located
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/game)
-
 include(FetchContent)
 FetchContent_Declare(
     TAGEngine
@@ -28,4 +25,7 @@ file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}*.c
 )
 add_executable(${PROJECT_NAME} ${GAME_SOURCES})
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/game/include)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE TAGEngine)

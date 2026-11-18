@@ -1,4 +1,4 @@
-#include "../include/ImGuiHandlerClass.hpp"
+#include <util/ImGuiHandlerClass.hpp>
 
 void ImGuiHandler::createContext(GLFWwindow* window) {
 	if (!context_created) {
